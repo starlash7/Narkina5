@@ -111,9 +111,9 @@ export function Header() {
                     border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}>
                     <Link to="/" style={navLinkStyle('/')}>Home</Link>
-                    <Link to="/personality" style={navLinkStyle('/personality')}>Personality</Link>
+                    <Link to="/marketplace" style={navLinkStyle('/marketplace')}>Marketplace</Link>
+                    <Link to="/dashboard" style={navLinkStyle('/dashboard')}>Dashboard</Link>
                     <Link to="/about" style={navLinkStyle('/about')}>About</Link>
-                    <Link to="/contact" style={navLinkStyle('/contact')}>Contact</Link>
                 </nav>
 
                 {/* Wallet Connection */}

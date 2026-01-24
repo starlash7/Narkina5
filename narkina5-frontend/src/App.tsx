@@ -5,6 +5,8 @@ import { Home } from './pages/Home';
 import { Personality } from './pages/Personality';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
+import { Marketplace } from './pages/Marketplace';
+import { Dashboard } from './pages/Dashboard';
 
 const queryClient = new QueryClient();
 
@@ -19,6 +21,8 @@ function App() {
             <Route path="/personality" element={<Personality />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
           </Routes>
         </div>
       </BrowserRouter>
