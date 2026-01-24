@@ -1,5 +1,6 @@
 import { usePrivy } from '@privy-io/react-auth';
 import { Link } from 'react-router-dom';
+import { useSolana } from '../contexts/SolanaContext';
 
 // Icons
 const WalletIcon = () => (
@@ -71,6 +72,7 @@ const MOCK_ACTIVITY = [
 
 export function Dashboard() {
     const { authenticated, login, user } = usePrivy();
+    const { balance, isLoading: balanceLoading, refreshBalance, network } = useSolana();
 
     const getDisplayName = () => {
         if (user?.wallet?.address) {
@@ -214,15 +216,39 @@ export function Dashboard() {
                         border: '1px solid rgba(255, 107, 53, 0.2)',
                         background: 'rgba(26, 26, 26, 0.5)',
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                            <span style={{ color: '#ff6b35' }}><WalletIcon /></span>
-                            <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Wallet Balance</span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ color: '#ff6b35' }}><WalletIcon /></span>
+                                <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Wallet Balance</span>
+                            </div>
+                            <button
+                                onClick={refreshBalance}
+                                disabled={balanceLoading}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#6b7280',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '0.25rem',
+                                    transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = '#ff6b35'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
+                            >
+                                {balanceLoading ? 'Loading...' : 'Refresh'}
+                            </button>
                         </div>
                         <p style={{ fontSize: '2rem', fontWeight: 700, color: '#e5e5e5', margin: 0 }}>
-                            2.45 <span style={{ fontSize: '1rem', color: '#6b7280' }}>SOL</span>
+                            {balanceLoading ? '...' : balance !== null ? balance.toFixed(4) : '0.00'} <span style={{ fontSize: '1rem', color: '#6b7280' }}>SOL</span>
                         </p>
                         <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>
-                            ≈ $245.00 USD
+                            {network === 'devnet' ? (
+                                <span style={{ color: '#eab308' }}>Devnet</span>
+                            ) : (
+                                `≈ $${((balance || 0) * 100).toFixed(2)} USD`
+                            )}
                         </p>
                     </div>
 

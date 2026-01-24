@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { PrivyProvider } from '@privy-io/react-auth'
+import { SolanaProvider } from './contexts/SolanaContext'
 import './index.css'
 import App from './App.tsx'
 
@@ -16,7 +17,9 @@ createRoot(document.getElementById('root')!).render(
         loginMethods: ['email', 'wallet', 'google', 'twitter'],
       }}
     >
-      <App />
+      <SolanaProvider>
+        <App />
+      </SolanaProvider>
     </PrivyProvider>
   </StrictMode>,
 )
