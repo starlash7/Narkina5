@@ -47,10 +47,10 @@ export function Home() {
     };
 
     const features = [
-        { icon: <Terminal />, title: 'AI Agent', desc: 'ElizaOS 기반 자율 에이전트' },
-        { icon: <Cube />, title: 'Blockchain', desc: '탈중앙화 인프라 구축' },
-        { icon: <Zap />, title: 'Performance', desc: '빠르고 정확한 처리' },
-        { icon: <Shield />, title: 'Security', desc: '안전한 스마트 컨트랙트' },
+        { icon: <Terminal />, title: 'AI Agent', desc: 'Autonomous agent powered by ElizaOS' },
+        { icon: <Cube />, title: 'Blockchain', desc: 'Decentralized infrastructure' },
+        { icon: <Zap />, title: 'Performance', desc: 'Fast and precise execution' },
+        { icon: <Shield />, title: 'Security', desc: 'Secure smart contracts' },
     ];
 
     return (
@@ -117,27 +117,52 @@ export function Home() {
                         }}>{">_"}</span>
                     </div>
 
-                    <h1 style={{
-                        fontSize: '4.5rem',
-                        fontWeight: 'bold',
-                        margin: '0 0 1rem 0',
-                        background: 'linear-gradient(135deg, #ffffff, #9ca3af)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '1rem',
                     }}>
-                        NARKINA5
-                    </h1>
+                        <h1 style={{
+                            fontSize: '4rem',
+                            fontWeight: 800,
+                            margin: 0,
+                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            letterSpacing: '-0.02em',
+                        }}>
+                            NARKINA
+                        </h1>
+                        <span style={{
+                            fontSize: '4rem',
+                            fontWeight: 800,
+                            color: '#ffffff',
+                            letterSpacing: '-0.02em',
+                        }}>5</span>
+                    </div>
+
+                    <p style={{
+                        fontSize: '1.125rem',
+                        color: '#6b7280',
+                        marginBottom: '0.5rem',
+                        fontFamily: 'inherit',
+                        letterSpacing: '0.2em',
+                        textTransform: 'uppercase',
+                    }}>
+                        Decentralized AI Agent Collective
+                    </p>
 
                     <p style={{
                         fontSize: '1.25rem',
                         color: '#9ca3af',
-                        maxWidth: '40rem',
-                        margin: '0 0 2rem 0',
+                        maxWidth: '36rem',
+                        margin: '1rem 0 2rem 0',
                         lineHeight: 1.6,
                     }}>
-                        탈중앙화 AI 에이전트 네트워크. 블록체인과 AI의 융합으로<br />
-                        새로운 디지털 인프라를 구축합니다.
+                        Where blockchain meets artificial intelligence.<br />
+                        Building the future of autonomous digital infrastructure.
                     </p>
 
                     <div style={{ display: 'flex', gap: '1rem' }}>

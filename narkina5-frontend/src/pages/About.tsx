@@ -18,11 +18,11 @@ const Globe = () => (
 
 export function About() {
     const techStack = [
-        { name: 'ElizaOS Framework', desc: 'AI 에이전트 코어 엔진' },
-        { name: 'React & TypeScript', desc: '프론트엔드 인터페이스' },
-        { name: 'Blockchain Integration', desc: '온체인 데이터 연동' },
-        { name: 'AI Model Integration', desc: 'OpenAI API 활용' },
-        { name: 'Web3 Technologies', desc: '지갑 연결 & 트랜잭션' },
+        { name: 'ElizaOS Framework', desc: 'AI agent core engine' },
+        { name: 'React & TypeScript', desc: 'Frontend interface' },
+        { name: 'Blockchain Integration', desc: 'On-chain data connectivity' },
+        { name: 'AI Model Integration', desc: 'OpenAI API powered' },
+        { name: 'Web3 Technologies', desc: 'Wallet connection & transactions' },
     ];
 
     return (
@@ -79,9 +79,9 @@ export function About() {
                     marginBottom: '3rem',
                 }}>
                     {[
-                        { icon: <Target />, title: 'Mission', desc: '블록체인과 AI의 융합으로 자율적인 디지털 에이전트 생태계를 구축합니다.' },
-                        { icon: <Layers />, title: 'Technology', desc: 'ElizaOS 프레임워크 기반으로 정밀하고 효율적인 AI 시스템을 제공합니다.' },
-                        { icon: <Globe />, title: 'Vision', desc: '탈중앙화된 AI 네트워크로 개인과 커뮤니티에 힘을 실어줍니다.' },
+                        { icon: <Target />, title: 'Mission', desc: 'Building autonomous digital agent ecosystems through blockchain and AI fusion.' },
+                        { icon: <Layers />, title: 'Technology', desc: 'Precise and efficient AI systems powered by the ElizaOS framework.' },
+                        { icon: <Globe />, title: 'Vision', desc: 'Empowering individuals and communities through decentralized AI networks.' },
                     ].map((card, idx) => (
                         <div
                             key={idx}

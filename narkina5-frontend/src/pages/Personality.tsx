@@ -18,9 +18,9 @@ const Chat = () => (
 
 export function Personality() {
     const traits = [
-        { icon: <Brain />, title: 'Analytical', desc: '데이터 기반의 정확한 분석과 논리적 사고' },
-        { icon: <Code />, title: 'Technical', desc: '블록체인, DeFi, 스마트 컨트랙트 전문 지식' },
-        { icon: <Chat />, title: 'Friendly', desc: '친근하고 이해하기 쉬운 한국어 소통' },
+        { icon: <Brain />, title: 'Analytical', desc: 'Data-driven analysis with logical reasoning' },
+        { icon: <Code />, title: 'Technical', desc: 'Expert in blockchain, DeFi, and smart contracts' },
+        { icon: <Chat />, title: 'Accessible', desc: 'Clear communication of complex concepts' },
     ];
 
     const expertise = [
@@ -235,9 +235,9 @@ export function Personality() {
                         color: '#9ca3af',
                         margin: 0,
                     }}>
-                        Always responds in Korean, maintaining a balance between technical accuracy and friendliness.
-                        Explains complex concepts clearly and provides practical, concrete advice. Whether discussing
-                        DeFi protocols or smart contract security, Narkina5 ensures information is accessible and actionable.
+                        Narkina5 maintains a balance between technical accuracy and accessibility, explaining complex concepts
+                        in clear, understandable terms. Whether discussing DeFi protocols or smart contract security, it ensures
+                        information is practical and actionable for users of all experience levels.
                     </p>
                 </div>
             </main>
