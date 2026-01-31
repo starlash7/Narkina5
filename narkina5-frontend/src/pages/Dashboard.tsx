@@ -1,55 +1,7 @@
 import { usePrivy } from '@privy-io/react-auth';
 import { Link } from 'react-router-dom';
 import { useSolana } from '../contexts/SolanaContext';
-
-// Icons
-const WalletIcon = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-    </svg>
-);
-
-const ChartIcon = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-);
-
-const TaskIcon = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-    </svg>
-);
-
-const ClockIcon = () => (
-    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-);
-
-const ArrowUpIcon = () => (
-    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-    </svg>
-);
-
-const ArrowDownIcon = () => (
-    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-    </svg>
-);
-
-const CheckCircleIcon = () => (
-    <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-);
-
-const ExternalLinkIcon = () => (
-    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-    </svg>
-);
+import { WalletIcon, ChartIcon, TaskIcon, ClockIcon, ArrowUpIcon, ArrowDownIcon, CheckCircleIcon, ExternalLinkIcon } from '../components/Icons';
 
 // Mock data
 const MOCK_MY_TASKS = [
@@ -130,7 +82,7 @@ export function Dashboard() {
                         justifyContent: 'center',
                         color: '#ff6b35',
                     }}>
-                        <WalletIcon />
+                        <WalletIcon size="1.5rem" />
                     </div>
                     <h2 style={{ color: '#e5e5e5', fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>
                         Connect Your Wallet
@@ -218,7 +170,7 @@ export function Dashboard() {
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ color: '#ff6b35' }}><WalletIcon /></span>
+                                <span style={{ color: '#ff6b35' }}><WalletIcon size="1.5rem" /></span>
                                 <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Wallet Balance</span>
                             </div>
                             <button

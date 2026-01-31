@@ -1,4 +1,4 @@
-import { Connection, PublicKey, LAMPORTS_PER_SOL, SystemProgram, TransactionInstruction } from '@solana/web3.js';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 // ── Constants ──────────────────────────────────────────
 export const PROGRAM_ID = new PublicKey('EopUaCV2svxj9j4hd7KjbrWfdjkspmm2BCBe7jGpKzKZ');
@@ -15,14 +15,16 @@ const U64_SIZE = 8;
 const DISCRIMINATOR_SIZE = 8;
 
 // ── Task State ─────────────────────────────────────────
-export enum TaskState {
-    Open = 0,
-    InProgress = 1,
-    PendingValidation = 2,
-    Completed = 3,
-    Cancelled = 4,
-    Disputed = 5,
-}
+export const TaskState = {
+    Open: 0,
+    InProgress: 1,
+    PendingValidation: 2,
+    Completed: 3,
+    Cancelled: 4,
+    Disputed: 5,
+} as const;
+
+export type TaskState = (typeof TaskState)[keyof typeof TaskState];
 
 export const TaskStateLabels: Record<TaskState, string> = {
     [TaskState.Open]: 'open',

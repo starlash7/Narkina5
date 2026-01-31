@@ -3,9 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
-import { Personality } from './pages/Personality';
 import { About } from './pages/About';
-import { Contact } from './pages/Contact';
 import { Marketplace } from './pages/Marketplace';
 import { Dashboard } from './pages/Dashboard';
 
@@ -19,9 +17,7 @@ function App() {
           <Header />
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/personality" element={<Personality />} />
             <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/dashboard" element={<Dashboard />} />
           </Routes>
