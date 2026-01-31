@@ -77,8 +77,8 @@ export function Header() {
 
     const navLinks = [
         { path: '/', label: 'Home' },
-        { path: '/marketplace', label: 'Marketplace' },
-        { path: '/dashboard', label: 'Dashboard' },
+        { path: '/marketplace', label: 'Training Floor' },
+        { path: '/dashboard', label: 'My Agents' },
         { path: '/about', label: 'About' },
     ];
 

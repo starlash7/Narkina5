@@ -25,8 +25,8 @@ export function Footer() {
         {
             title: 'Product',
             links: [
-                { label: 'Marketplace', to: '/marketplace' },
-                { label: 'Dashboard', to: '/dashboard' },
+                { label: 'Training Floor', to: '/marketplace' },
+                { label: 'My Agents', to: '/dashboard' },
                 { label: 'Documentation', to: '#' },
             ],
         },
@@ -111,7 +111,7 @@ export function Footer() {
                             lineHeight: 1.6,
                             margin: 0,
                         }}>
-                            Decentralized AI Agent Collective powered by Solana.
+                            AI Agent Training Factory on Solana.
                         </p>
                     </div>
 

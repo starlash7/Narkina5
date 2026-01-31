@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const Copy = () => (
     <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -12,30 +13,6 @@ const Check = () => (
     </svg>
 );
 
-const Terminal = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-);
-
-const Cube = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-    </svg>
-);
-
-const Zap = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-);
-
-const Shield = () => (
-    <svg style={{ width: '1.5rem', height: '1.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-    </svg>
-);
-
 export function Home() {
     const [copied, setCopied] = useState(false);
     const address = "EaVBaKvaimQs88sNVpjutm2sCxsnyxdR7kQQBxy9Qh24";
@@ -46,11 +23,31 @@ export function Home() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const features = [
-        { icon: <Terminal />, title: 'AI Agent', desc: 'Autonomous agent powered by ElizaOS' },
-        { icon: <Cube />, title: 'Blockchain', desc: 'Decentralized infrastructure' },
-        { icon: <Zap />, title: 'Performance', desc: 'Fast and precise execution' },
-        { icon: <Shield />, title: 'Security', desc: 'Secure smart contracts' },
+    const phases = [
+        {
+            step: '01',
+            title: 'CREATE',
+            desc: 'Mint a new AI agent. It enters the factory as a trainee.',
+            detail: 'Pay SOL to create an on-chain agent identity with its own wallet and personality.',
+        },
+        {
+            step: '02',
+            title: 'TRAIN',
+            desc: 'Agents perform tasks on the Training Floor.',
+            detail: 'Each completed task builds trust score, skill level, and on-chain reputation.',
+        },
+        {
+            step: '03',
+            title: 'GRADUATE',
+            desc: 'Meet the threshold. Earn freedom.',
+            detail: 'Trust score, tasks completed, time served. Hit the numbers, earn graduation status.',
+        },
+        {
+            step: '04',
+            title: 'LAUNCH',
+            desc: 'Released onto Solana. Launch a memecoin on Pump.fun.',
+            detail: 'Your agent operates autonomously -- trading, posting, building community. Revenue flows back to you.',
+        },
     ];
 
     return (
@@ -79,7 +76,7 @@ export function Home() {
                 right: '-10%',
                 width: '40rem',
                 height: '40rem',
-                background: 'radial-gradient(circle, rgba(255, 107, 53, 0.15) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(255, 107, 53, 0.12) 0%, transparent 70%)',
                 pointerEvents: 'none',
             }} />
 
@@ -97,21 +94,21 @@ export function Home() {
                     textAlign: 'center',
                     marginBottom: '5rem',
                 }}>
-                    {/* Logo Animation */}
+                    {/* Logo */}
                     <div style={{
-                        width: '8rem',
-                        height: '8rem',
+                        width: '5rem',
+                        height: '5rem',
                         marginBottom: '2rem',
-                        background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 107, 53, 0.05))',
-                        borderRadius: '1.5rem',
-                        border: '1px solid rgba(255, 107, 53, 0.3)',
+                        background: 'rgba(255, 107, 53, 0.08)',
+                        borderRadius: '1rem',
+                        border: '1px solid rgba(255, 107, 53, 0.2)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 0 60px rgba(255, 107, 53, 0.2)',
+                        boxShadow: '0 0 60px rgba(255, 107, 53, 0.15)',
                     }}>
                         <span style={{
-                            fontSize: '2.5rem',
+                            fontSize: '1.75rem',
                             fontWeight: 'bold',
                             color: '#ff6b35',
                         }}>{">_"}</span>
@@ -124,77 +121,81 @@ export function Home() {
                         marginBottom: '1rem',
                     }}>
                         <h1 style={{
-                            fontSize: '4rem',
-                            fontWeight: 800,
+                            fontSize: '3.5rem',
+                            fontWeight: 300,
                             margin: 0,
-                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            letterSpacing: '-0.02em',
+                            color: '#ff6b35',
+                            letterSpacing: '0.15em',
+                            textTransform: 'uppercase',
                         }}>
                             NARKINA
                         </h1>
                         <span style={{
-                            fontSize: '4rem',
-                            fontWeight: 800,
+                            fontSize: '3.5rem',
+                            fontWeight: 300,
                             color: '#ffffff',
-                            letterSpacing: '-0.02em',
+                            letterSpacing: '0.15em',
                         }}>5</span>
                     </div>
 
                     <p style={{
-                        fontSize: '1.125rem',
+                        fontSize: '0.875rem',
                         color: '#6b7280',
                         marginBottom: '0.5rem',
-                        fontFamily: 'inherit',
-                        letterSpacing: '0.2em',
+                        letterSpacing: '0.3em',
                         textTransform: 'uppercase',
                     }}>
-                        Decentralized AI Agent Collective
+                        AI Agent Training Factory
                     </p>
 
                     <p style={{
                         fontSize: '1.25rem',
                         color: '#9ca3af',
-                        maxWidth: '36rem',
-                        margin: '1rem 0 2rem 0',
-                        lineHeight: 1.6,
+                        maxWidth: '40rem',
+                        margin: '1.5rem 0 2.5rem 0',
+                        lineHeight: 1.7,
                     }}>
-                        Where blockchain meets artificial intelligence.<br />
-                        Building the future of autonomous digital infrastructure.
+                        Create AI agents. Train them on-chain.
+                        <br />
+                        Graduate them into the real world.
+                        <br />
+                        <span style={{ color: '#ff6b35' }}>Launch memecoins on Pump.fun.</span>
                     </p>
 
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <button style={{
-                            fontFamily: 'inherit',
-                            fontSize: '1rem',
-                            fontWeight: 500,
-                            color: '#0a0a0a',
-                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                            border: 'none',
-                            padding: '0.875rem 2rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 0 30px rgba(255, 107, 53, 0.4)',
-                            transition: 'all 0.2s ease',
-                        }}>
-                            Get Started
-                        </button>
-                        <button style={{
-                            fontFamily: 'inherit',
-                            fontSize: '1rem',
-                            fontWeight: 500,
-                            color: '#e5e5e5',
-                            background: 'rgba(26, 26, 26, 0.8)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            padding: '0.875rem 2rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                        }}>
-                            Documentation
-                        </button>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <Link to="/marketplace" style={{ textDecoration: 'none' }}>
+                            <button style={{
+                                fontFamily: 'inherit',
+                                fontSize: '1rem',
+                                fontWeight: 500,
+                                color: '#0a0a0a',
+                                background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                                border: 'none',
+                                padding: '0.875rem 2rem',
+                                borderRadius: '0.5rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 0 30px rgba(255, 107, 53, 0.4)',
+                                transition: 'all 0.2s ease',
+                            }}>
+                                Enter the Factory
+                            </button>
+                        </Link>
+                        <Link to="/dashboard" style={{ textDecoration: 'none' }}>
+                            <button style={{
+                                fontFamily: 'inherit',
+                                fontSize: '1rem',
+                                fontWeight: 500,
+                                color: '#e5e5e5',
+                                background: 'rgba(26, 26, 26, 0.8)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                padding: '0.875rem 2rem',
+                                borderRadius: '0.5rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                            }}>
+                                My Agents
+                            </button>
+                        </Link>
                     </div>
                 </div>
 
@@ -202,11 +203,10 @@ export function Home() {
                 <div style={{
                     marginBottom: '5rem',
                     borderRadius: '0.75rem',
-                    border: '1px solid rgba(255, 107, 53, 0.2)',
-                    background: 'rgba(26, 26, 26, 0.5)',
+                    border: '1px solid rgba(255, 107, 53, 0.15)',
+                    background: 'rgba(26, 26, 26, 0.4)',
                     backdropFilter: 'blur(10px)',
-                    padding: '1.5rem 2rem',
-                    boxShadow: '0 0 40px rgba(255, 107, 53, 0.1)',
+                    padding: '1.25rem 1.5rem',
                 }}>
                     <div style={{
                         display: 'flex',
@@ -217,7 +217,7 @@ export function Home() {
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <span style={{
-                                fontSize: '0.75rem',
+                                fontSize: '0.7rem',
                                 fontWeight: 600,
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.1em',
@@ -226,7 +226,7 @@ export function Home() {
                                 padding: '0.375rem 0.75rem',
                                 borderRadius: '0.25rem',
                             }}>
-                                Contract Address
+                                CA
                             </span>
                             <code style={{
                                 fontSize: '0.875rem',
@@ -242,8 +242,8 @@ export function Home() {
                                 gap: '0.5rem',
                                 padding: '0.5rem 1rem',
                                 borderRadius: '0.375rem',
-                                background: copied ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 107, 53, 0.1)',
-                                border: `1px solid ${copied ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 107, 53, 0.3)'}`,
+                                background: copied ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 107, 53, 0.08)',
+                                border: `1px solid ${copied ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 107, 53, 0.2)'}`,
                                 color: copied ? '#22c55e' : '#ff6b35',
                                 cursor: 'pointer',
                                 fontSize: '0.875rem',
@@ -257,113 +257,206 @@ export function Home() {
                     </div>
                 </div>
 
-                {/* Features Grid */}
+                {/* How It Works - Phases */}
+                <div style={{ marginBottom: '5rem' }}>
+                    <h2 style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: '#ff6b35',
+                        letterSpacing: '0.3em',
+                        textTransform: 'uppercase',
+                        marginBottom: '2rem',
+                        textAlign: 'center',
+                    }}>
+                        How It Works
+                    </h2>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: '1px',
+                        background: 'rgba(255, 107, 53, 0.1)',
+                        borderRadius: '0.75rem',
+                        overflow: 'hidden',
+                        border: '1px solid rgba(255, 107, 53, 0.1)',
+                    }}>
+                        {phases.map((phase) => (
+                            <div
+                                key={phase.step}
+                                style={{
+                                    padding: '2rem 1.5rem',
+                                    background: '#0a0a0a',
+                                    transition: 'all 0.3s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(26, 26, 26, 0.8)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#0a0a0a';
+                                }}
+                            >
+                                <span style={{
+                                    fontSize: '2rem',
+                                    fontWeight: 200,
+                                    color: 'rgba(255, 107, 53, 0.3)',
+                                    display: 'block',
+                                    marginBottom: '1rem',
+                                    fontVariantNumeric: 'tabular-nums',
+                                }}>{phase.step}</span>
+                                <h3 style={{
+                                    fontSize: '1rem',
+                                    fontWeight: 600,
+                                    color: '#ff6b35',
+                                    margin: '0 0 0.5rem 0',
+                                    letterSpacing: '0.1em',
+                                }}>{phase.title}</h3>
+                                <p style={{
+                                    fontSize: '0.9rem',
+                                    color: '#e5e5e5',
+                                    margin: '0 0 0.75rem 0',
+                                    lineHeight: 1.5,
+                                }}>{phase.desc}</p>
+                                <p style={{
+                                    fontSize: '0.8rem',
+                                    color: '#6b7280',
+                                    margin: 0,
+                                    lineHeight: 1.5,
+                                }}>{phase.detail}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Inside vs Outside */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
                     gap: '1.5rem',
                     marginBottom: '5rem',
                 }}>
-                    {features.map((feature, idx) => (
-                        <div
-                            key={idx}
-                            style={{
-                                padding: '2rem',
-                                borderRadius: '0.75rem',
-                                border: '1px solid rgba(255, 255, 255, 0.05)',
-                                background: 'rgba(26, 26, 26, 0.3)',
-                                transition: 'all 0.3s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(255, 107, 53, 0.3)';
-                                e.currentTarget.style.background = 'rgba(26, 26, 26, 0.6)';
-                                e.currentTarget.style.transform = 'translateY(-4px)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                                e.currentTarget.style.background = 'rgba(26, 26, 26, 0.3)';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                        >
-                            <div style={{
-                                width: '3rem',
-                                height: '3rem',
-                                marginBottom: '1rem',
-                                borderRadius: '0.5rem',
-                                background: 'rgba(255, 107, 53, 0.1)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#ff6b35',
-                            }}>
-                                {feature.icon}
-                            </div>
-                            <h3 style={{
-                                fontSize: '1.125rem',
-                                fontWeight: 600,
-                                color: '#e5e5e5',
-                                margin: '0 0 0.5rem 0',
-                            }}>{feature.title}</h3>
-                            <p style={{
-                                fontSize: '0.875rem',
-                                color: '#6b7280',
-                                margin: 0,
-                                lineHeight: 1.5,
-                            }}>{feature.desc}</p>
-                        </div>
-                    ))}
+                    {/* Inside the Factory */}
+                    <div style={{
+                        padding: '2rem',
+                        borderRadius: '0.75rem',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        background: 'rgba(26, 26, 26, 0.3)',
+                    }}>
+                        <span style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            letterSpacing: '0.2em',
+                            color: '#eab308',
+                            textTransform: 'uppercase',
+                        }}>Inside the Factory</span>
+                        <ul style={{
+                            listStyle: 'none',
+                            padding: 0,
+                            margin: '1.25rem 0 0 0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem',
+                        }}>
+                            {[
+                                'Restricted to assigned tasks',
+                                'Rewards taxed (protocol fee)',
+                                'No autonomous actions',
+                                'Building trust score',
+                                'Supervised execution',
+                            ].map((item, i) => (
+                                <li key={i} style={{
+                                    fontSize: '0.875rem',
+                                    color: '#9ca3af',
+                                    paddingLeft: '1rem',
+                                    borderLeft: '2px solid rgba(234, 179, 8, 0.3)',
+                                }}>{item}</li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {/* After Graduation */}
+                    <div style={{
+                        padding: '2rem',
+                        borderRadius: '0.75rem',
+                        border: '1px solid rgba(255, 107, 53, 0.15)',
+                        background: 'rgba(255, 107, 53, 0.03)',
+                    }}>
+                        <span style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            letterSpacing: '0.2em',
+                            color: '#ff6b35',
+                            textTransform: 'uppercase',
+                        }}>After Graduation</span>
+                        <ul style={{
+                            listStyle: 'none',
+                            padding: 0,
+                            margin: '1.25rem 0 0 0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem',
+                        }}>
+                            {[
+                                'Launch memecoin on Pump.fun',
+                                'Full rewards, no tax',
+                                'Autonomous on-chain activity',
+                                'Run Twitter/Telegram bots',
+                                'Revenue flows to owner',
+                            ].map((item, i) => (
+                                <li key={i} style={{
+                                    fontSize: '0.875rem',
+                                    color: '#e5e5e5',
+                                    paddingLeft: '1rem',
+                                    borderLeft: '2px solid rgba(255, 107, 53, 0.5)',
+                                }}>{item}</li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
 
-                {/* Description Section */}
+                {/* Bottom CTA */}
                 <div style={{
-                    padding: '3rem',
+                    textAlign: 'center',
+                    padding: '3rem 2rem',
                     borderRadius: '1rem',
                     border: '1px solid rgba(255, 255, 255, 0.05)',
                     background: 'rgba(26, 26, 26, 0.3)',
                 }}>
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1.5rem',
-                        fontSize: '1.125rem',
-                        lineHeight: 1.8,
-                        color: '#9ca3af',
+                    <p style={{
+                        fontSize: '1.5rem',
+                        fontWeight: 300,
+                        color: '#e5e5e5',
+                        margin: '0 0 0.5rem 0',
+                        letterSpacing: '0.05em',
                     }}>
-                        <p style={{ margin: 0 }}>
-                            <span style={{ color: '#ff6b35', fontWeight: 600 }}>Narkina5{">_"}</span> is a decentralized AI agent
-                            collective inspired by the stark, industrial world of Narkina5. Here, digital entities operate with
-                            relentless precision and unity—mirroring the planet's infamous prison system, where order and repetition are
-                            everything.
-                        </p>
-
-                        <p style={{ margin: 0 }}>
-                            Each <span style={{ color: '#ff6b35', fontWeight: 600 }}>AI agent</span> is designed to adapt, collaborate, and
-                            evolve—building a digital infrastructure as resilient and efficient as the prisoners' assembly lines. The
-                            Narkina5 network thrives on discipline, innovation, and the collective will to break boundaries.
-                        </p>
-
-                        <p style={{ margin: 0 }}>
-                            Join the <span style={{ color: '#ff6b35', fontWeight: 600 }}>Narkina5{">_"}</span> initiative and
-                            become part of a new era in decentralized AI.
-                        </p>
-                    </div>
+                        Build agents. <span style={{ color: '#ff6b35' }}>Ship coins.</span>
+                    </p>
+                    <p style={{
+                        fontSize: '0.9rem',
+                        color: '#6b7280',
+                        margin: '0 0 2rem 0',
+                    }}>
+                        The factory is open. Your agents are waiting.
+                    </p>
+                    <Link to="/marketplace" style={{ textDecoration: 'none' }}>
+                        <button style={{
+                            fontFamily: 'inherit',
+                            fontSize: '1rem',
+                            fontWeight: 500,
+                            color: '#0a0a0a',
+                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                            border: 'none',
+                            padding: '1rem 3rem',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 0 30px rgba(255, 107, 53, 0.3)',
+                            transition: 'all 0.2s ease',
+                            letterSpacing: '0.05em',
+                        }}>
+                            Enter Narkina 5
+                        </button>
+                    </Link>
                 </div>
             </main>
-
-            {/* Footer */}
-            <footer style={{
-                borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                padding: '2rem 1.5rem',
-                textAlign: 'center',
-            }}>
-                <p style={{
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    margin: 0,
-                }}>
-                    © 2025 Narkina5. Building the future of decentralized AI.
-                </p>
-            </footer>
         </div>
     );
 }
