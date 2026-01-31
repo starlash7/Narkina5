@@ -124,22 +124,20 @@ export function Home() {
                         marginBottom: '1rem',
                     }}>
                         <h1 style={{
-                            fontSize: '4rem',
-                            fontWeight: 800,
+                            fontSize: '3.5rem',
+                            fontWeight: 300,
                             margin: 0,
-                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            letterSpacing: '-0.02em',
+                            color: '#ff6b35',
+                            letterSpacing: '0.15em',
+                            textTransform: 'uppercase',
                         }}>
                             NARKINA
                         </h1>
                         <span style={{
-                            fontSize: '4rem',
-                            fontWeight: 800,
+                            fontSize: '3.5rem',
+                            fontWeight: 300,
                             color: '#ffffff',
-                            letterSpacing: '-0.02em',
+                            letterSpacing: '0.15em',
                         }}>5</span>
                     </div>
 

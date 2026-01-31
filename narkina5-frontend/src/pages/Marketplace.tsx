@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { useSolana } from '../contexts/SolanaContext';
+import { fetchTasks, taskToDisplay, TaskState, TaskStateLabels, type TaskDisplay } from '../services/agenc';
 
 // Icons
 const PlusIcon = () => (
@@ -32,10 +34,22 @@ const ShieldIcon = () => (
     </svg>
 );
 
-// Mock task data for demo
-const MOCK_TASKS = [
+const RefreshIcon = () => (
+    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+);
+
+const ChainIcon = () => (
+    <svg style={{ width: '0.75rem', height: '0.75rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+    </svg>
+);
+
+// Demo tasks shown when no on-chain tasks exist
+const DEMO_TASKS: TaskDisplay[] = [
     {
-        id: 'task_001',
+        id: 'demo_001',
         title: 'Data Analysis Pipeline',
         description: 'Build an automated data pipeline to process CSV files and generate insights',
         reward: 0.5,
@@ -43,9 +57,11 @@ const MOCK_TASKS = [
         status: 'open',
         createdAt: '2h ago',
         category: 'Compute',
+        pda: '',
+        onChain: false,
     },
     {
-        id: 'task_002',
+        id: 'demo_002',
         title: 'Smart Contract Audit',
         description: 'Review and audit a DeFi smart contract for security vulnerabilities',
         reward: 2.0,
@@ -53,19 +69,23 @@ const MOCK_TASKS = [
         status: 'open',
         createdAt: '5h ago',
         category: 'Security',
+        pda: '',
+        onChain: false,
     },
     {
-        id: 'task_003',
+        id: 'demo_003',
         title: 'ML Model Training',
         description: 'Train a sentiment analysis model on social media data',
         reward: 1.5,
         creator: '3kNp...wX8z',
-        status: 'claimed',
+        status: 'in_progress',
         createdAt: '1d ago',
         category: 'Inference',
+        pda: '',
+        onChain: false,
     },
     {
-        id: 'task_004',
+        id: 'demo_004',
         title: 'API Integration',
         description: 'Integrate multiple REST APIs and create a unified endpoint',
         reward: 0.8,
@@ -73,25 +93,19 @@ const MOCK_TASKS = [
         status: 'open',
         createdAt: '3h ago',
         category: 'Network',
+        pda: '',
+        onChain: false,
     },
 ];
 
-interface Task {
-    id: string;
-    title: string;
-    description: string;
-    reward: number;
-    creator: string;
-    status: string;
-    createdAt: string;
-    category: string;
-}
-
 export function Marketplace() {
     const { authenticated, login } = usePrivy();
+    const { connection, network } = useSolana();
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-    const [filter, setFilter] = useState<'all' | 'open' | 'claimed'>('all');
+    const [tasks, setTasks] = useState<TaskDisplay[]>(DEMO_TASKS);
+    const [filter, setFilter] = useState<'all' | 'open' | 'in_progress'>('all');
+    const [isLoading, setIsLoading] = useState(false);
+    const [onChainCount, setOnChainCount] = useState(0);
     const [newTask, setNewTask] = useState({
         title: '',
         description: '',
@@ -99,15 +113,42 @@ export function Marketplace() {
         category: 'Compute',
     });
 
-    const filteredTasks = tasks.filter(task =>
-        filter === 'all' ? true : task.status === filter
-    );
+    // Fetch on-chain tasks
+    useEffect(() => {
+        loadOnChainTasks();
+    }, [connection]);
+
+    const loadOnChainTasks = async () => {
+        setIsLoading(true);
+        try {
+            const onChainTasks = await fetchTasks(connection);
+            const displayTasks = onChainTasks.map(taskToDisplay);
+            setOnChainCount(displayTasks.length);
+
+            if (displayTasks.length > 0) {
+                // Merge: on-chain first, then demo tasks
+                setTasks([...displayTasks, ...DEMO_TASKS]);
+            } else {
+                setTasks(DEMO_TASKS);
+            }
+        } catch (err) {
+            console.error('Failed to fetch on-chain tasks:', err);
+            setTasks(DEMO_TASKS);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const filteredTasks = tasks.filter(task => {
+        if (filter === 'all') return true;
+        return task.status === filter;
+    });
 
     const handleCreateTask = () => {
         if (!newTask.title || !newTask.description || !newTask.reward) return;
 
-        const task: Task = {
-            id: `task_${Date.now()}`,
+        const task: TaskDisplay = {
+            id: `local_${Date.now()}`,
             title: newTask.title,
             description: newTask.description,
             reward: parseFloat(newTask.reward),
@@ -115,6 +156,8 @@ export function Marketplace() {
             status: 'open',
             createdAt: 'Just now',
             category: newTask.category,
+            pda: '',
+            onChain: false,
         };
 
         setTasks([task, ...tasks]);
@@ -128,16 +171,18 @@ export function Marketplace() {
             return;
         }
         setTasks(tasks.map(t =>
-            t.id === taskId ? { ...t, status: 'claimed' } : t
+            t.id === taskId ? { ...t, status: 'in_progress' } : t
         ));
     };
 
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'open': return { bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.3)', text: '#22c55e' };
-            case 'claimed': return { bg: 'rgba(234, 179, 8, 0.1)', border: 'rgba(234, 179, 8, 0.3)', text: '#eab308' };
-            case 'completed': return { bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6' };
-            default: return { bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.3)', text: '#6b7280' };
+            case 'in_progress': return { bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6' };
+            case 'pending_validation': return { bg: 'rgba(234, 179, 8, 0.1)', border: 'rgba(234, 179, 8, 0.3)', text: '#eab308' };
+            case 'completed': return { bg: 'rgba(139, 92, 246, 0.1)', border: 'rgba(139, 92, 246, 0.3)', text: '#8b5cf6' };
+            case 'cancelled': return { bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.3)', text: '#6b7280' };
+            default: return { bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.3)', text: '#22c55e' };
         }
     };
 
@@ -187,45 +232,77 @@ export function Marketplace() {
                             <span style={{ color: '#ff6b35' }}><BriefcaseIcon /></span>
                             <span style={{ color: '#e5e5e5' }}>Task Marketplace</span>
                         </h1>
-                        <p style={{
-                            color: '#6b7280',
-                            margin: '0.5rem 0 0 0',
-                            fontSize: '1rem',
-                        }}>
-                            Create tasks, claim work, earn rewards with privacy
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
+                            <p style={{ color: '#6b7280', margin: 0, fontSize: '1rem' }}>
+                                Create tasks, claim work, earn rewards
+                            </p>
+                            <span style={{
+                                fontSize: '0.75rem',
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                background: network === 'devnet' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                                color: network === 'devnet' ? '#eab308' : '#22c55e',
+                                border: `1px solid ${network === 'devnet' ? 'rgba(234, 179, 8, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
+                            }}>
+                                {network}
+                            </span>
+                        </div>
                     </div>
 
-                    <button
-                        onClick={() => authenticated ? setShowCreateModal(true) : login()}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            fontFamily: 'inherit',
-                            fontSize: '1rem',
-                            fontWeight: 500,
-                            color: '#0a0a0a',
-                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                            border: 'none',
-                            padding: '0.75rem 1.5rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 0 20px rgba(255, 107, 53, 0.3)',
-                            transition: 'all 0.2s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 107, 53, 0.5)';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.boxShadow = '0 0 20px rgba(255, 107, 53, 0.3)';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                    >
-                        <PlusIcon />
-                        Create Task
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button
+                            onClick={loadOnChainTasks}
+                            disabled={isLoading}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontFamily: 'inherit',
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                                color: '#9ca3af',
+                                background: 'transparent',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                padding: '0.75rem 1.25rem',
+                                borderRadius: '0.5rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(255, 107, 53, 0.3)';
+                                e.currentTarget.style.color = '#ff6b35';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                e.currentTarget.style.color = '#9ca3af';
+                            }}
+                        >
+                            <RefreshIcon />
+                            {isLoading ? 'Syncing...' : 'Sync Chain'}
+                        </button>
+                        <button
+                            onClick={() => authenticated ? setShowCreateModal(true) : login()}
+                            className="btn-glow"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontFamily: 'inherit',
+                                fontSize: '1rem',
+                                fontWeight: 500,
+                                color: '#0a0a0a',
+                                background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                                border: 'none',
+                                padding: '0.75rem 1.5rem',
+                                borderRadius: '0.5rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 0 20px rgba(255, 107, 53, 0.3)',
+                            }}
+                        >
+                            <PlusIcon />
+                            Create Task
+                        </button>
+                    </div>
                 </div>
 
                 {/* Stats */}
@@ -238,7 +315,7 @@ export function Marketplace() {
                     {[
                         { label: 'Open Tasks', value: tasks.filter(t => t.status === 'open').length, color: '#22c55e' },
                         { label: 'Total Rewards', value: `${tasks.reduce((sum, t) => sum + t.reward, 0).toFixed(1)} SOL`, color: '#ff6b35' },
-                        { label: 'Active Agents', value: '24', color: '#3b82f6' },
+                        { label: 'On-Chain Tasks', value: onChainCount, color: '#3b82f6' },
                     ].map((stat, idx) => (
                         <div key={idx} style={{
                             padding: '1.25rem',
@@ -258,7 +335,7 @@ export function Marketplace() {
                     gap: '0.5rem',
                     marginBottom: '1.5rem',
                 }}>
-                    {(['all', 'open', 'claimed'] as const).map((f) => (
+                    {(['all', 'open', 'in_progress'] as const).map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
@@ -273,13 +350,21 @@ export function Marketplace() {
                                 borderRadius: '0.375rem',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
-                                textTransform: 'capitalize',
                             }}
                         >
-                            {f}
+                            {f === 'in_progress' ? 'In Progress' : f.charAt(0).toUpperCase() + f.slice(1)}
                         </button>
                     ))}
                 </div>
+
+                {/* Loading skeleton */}
+                {isLoading && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
+                        {[1, 2].map((i) => (
+                            <div key={i} className="skeleton" style={{ height: '120px', borderRadius: '0.75rem' }} />
+                        ))}
+                    </div>
+                )}
 
                 {/* Task List */}
                 <div style={{
@@ -292,20 +377,12 @@ export function Marketplace() {
                         return (
                             <div
                                 key={task.id}
+                                className="card-hover"
                                 style={{
                                     padding: '1.5rem',
                                     borderRadius: '0.75rem',
                                     border: '1px solid rgba(255, 255, 255, 0.05)',
                                     background: 'rgba(26, 26, 26, 0.5)',
-                                    transition: 'all 0.2s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.borderColor = 'rgba(255, 107, 53, 0.2)';
-                                    e.currentTarget.style.background = 'rgba(26, 26, 26, 0.7)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                                    e.currentTarget.style.background = 'rgba(26, 26, 26, 0.5)';
                                 }}
                             >
                                 <div style={{
@@ -336,10 +413,24 @@ export function Marketplace() {
                                                 border: `1px solid ${statusColors.border}`,
                                                 padding: '0.25rem 0.5rem',
                                                 borderRadius: '0.25rem',
-                                                textTransform: 'capitalize',
                                             }}>
-                                                {task.status}
+                                                {task.status.replace('_', ' ')}
                                             </span>
+                                            {task.onChain && (
+                                                <span style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.25rem',
+                                                    fontSize: '0.625rem',
+                                                    color: '#3b82f6',
+                                                    background: 'rgba(59, 130, 246, 0.1)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                    padding: '0.125rem 0.375rem',
+                                                    borderRadius: '0.25rem',
+                                                }}>
+                                                    <ChainIcon /> on-chain
+                                                </span>
+                                            )}
                                         </div>
                                         <p style={{
                                             color: '#9ca3af',
@@ -372,10 +463,7 @@ export function Marketplace() {
                                             }}>
                                                 {task.category}
                                             </span>
-                                            <span style={{
-                                                fontSize: '0.75rem',
-                                                color: '#6b7280',
-                                            }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                                                 by {task.creator}
                                             </span>
                                         </div>
@@ -434,7 +522,7 @@ export function Marketplace() {
                     })}
                 </div>
 
-                {filteredTasks.length === 0 && (
+                {filteredTasks.length === 0 && !isLoading && (
                     <div style={{
                         textAlign: 'center',
                         padding: '4rem 2rem',
@@ -458,7 +546,7 @@ export function Marketplace() {
                     zIndex: 100,
                     padding: '1rem',
                 }}>
-                    <div style={{
+                    <div className="animate-scale-in" style={{
                         background: '#1a1a1a',
                         borderRadius: '1rem',
                         border: '1px solid rgba(255, 107, 53, 0.2)',
@@ -477,115 +565,57 @@ export function Marketplace() {
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '0.875rem',
-                                    fontWeight: 500,
-                                    color: '#9ca3af',
-                                    marginBottom: '0.5rem',
-                                }}>Title</label>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#9ca3af', marginBottom: '0.5rem' }}>Title</label>
                                 <input
                                     type="text"
                                     value={newTask.title}
                                     onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                                     placeholder="Enter task title"
                                     style={{
-                                        width: '100%',
-                                        padding: '0.75rem',
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        background: 'rgba(26, 26, 26, 0.8)',
-                                        color: '#e5e5e5',
-                                        fontSize: '1rem',
-                                        fontFamily: 'inherit',
-                                        outline: 'none',
-                                        boxSizing: 'border-box',
+                                        width: '100%', padding: '0.75rem', borderRadius: '0.5rem',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(26, 26, 26, 0.8)',
+                                        color: '#e5e5e5', fontSize: '1rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
                                     }}
                                 />
                             </div>
-
                             <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '0.875rem',
-                                    fontWeight: 500,
-                                    color: '#9ca3af',
-                                    marginBottom: '0.5rem',
-                                }}>Description</label>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#9ca3af', marginBottom: '0.5rem' }}>Description</label>
                                 <textarea
                                     value={newTask.description}
                                     onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                                     placeholder="Describe the task requirements"
                                     rows={4}
                                     style={{
-                                        width: '100%',
-                                        padding: '0.75rem',
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        background: 'rgba(26, 26, 26, 0.8)',
-                                        color: '#e5e5e5',
-                                        fontSize: '1rem',
-                                        fontFamily: 'inherit',
-                                        outline: 'none',
-                                        resize: 'vertical',
-                                        boxSizing: 'border-box',
+                                        width: '100%', padding: '0.75rem', borderRadius: '0.5rem',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(26, 26, 26, 0.8)',
+                                        color: '#e5e5e5', fontSize: '1rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
                                     }}
                                 />
                             </div>
-
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                    <label style={{
-                                        display: 'block',
-                                        fontSize: '0.875rem',
-                                        fontWeight: 500,
-                                        color: '#9ca3af',
-                                        marginBottom: '0.5rem',
-                                    }}>Reward (SOL)</label>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#9ca3af', marginBottom: '0.5rem' }}>Reward (SOL)</label>
                                     <input
-                                        type="number"
-                                        step="0.1"
-                                        min="0.1"
+                                        type="number" step="0.1" min="0.1"
                                         value={newTask.reward}
                                         onChange={(e) => setNewTask({ ...newTask, reward: e.target.value })}
                                         placeholder="0.0"
                                         style={{
-                                            width: '100%',
-                                            padding: '0.75rem',
-                                            borderRadius: '0.5rem',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            background: 'rgba(26, 26, 26, 0.8)',
-                                            color: '#e5e5e5',
-                                            fontSize: '1rem',
-                                            fontFamily: 'inherit',
-                                            outline: 'none',
-                                            boxSizing: 'border-box',
+                                            width: '100%', padding: '0.75rem', borderRadius: '0.5rem',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(26, 26, 26, 0.8)',
+                                            color: '#e5e5e5', fontSize: '1rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
                                         }}
                                     />
                                 </div>
-
                                 <div>
-                                    <label style={{
-                                        display: 'block',
-                                        fontSize: '0.875rem',
-                                        fontWeight: 500,
-                                        color: '#9ca3af',
-                                        marginBottom: '0.5rem',
-                                    }}>Category</label>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#9ca3af', marginBottom: '0.5rem' }}>Category</label>
                                     <select
                                         value={newTask.category}
                                         onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
                                         style={{
-                                            width: '100%',
-                                            padding: '0.75rem',
-                                            borderRadius: '0.5rem',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            background: 'rgba(26, 26, 26, 0.8)',
-                                            color: '#e5e5e5',
-                                            fontSize: '1rem',
-                                            fontFamily: 'inherit',
-                                            outline: 'none',
-                                            boxSizing: 'border-box',
+                                            width: '100%', padding: '0.75rem', borderRadius: '0.5rem',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(26, 26, 26, 0.8)',
+                                            color: '#e5e5e5', fontSize: '1rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
                                         }}
                                     >
                                         <option value="Compute">Compute</option>
@@ -598,47 +628,23 @@ export function Marketplace() {
                             </div>
                         </div>
 
-                        <div style={{
-                            display: 'flex',
-                            gap: '1rem',
-                            marginTop: '2rem',
-                        }}>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
                             <button
                                 onClick={() => setShowCreateModal(false)}
                                 style={{
-                                    flex: 1,
-                                    fontFamily: 'inherit',
-                                    fontSize: '1rem',
-                                    fontWeight: 500,
-                                    color: '#9ca3af',
-                                    background: 'transparent',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    padding: '0.75rem',
-                                    borderRadius: '0.5rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
+                                    flex: 1, fontFamily: 'inherit', fontSize: '1rem', fontWeight: 500,
+                                    color: '#9ca3af', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    padding: '0.75rem', borderRadius: '0.5rem', cursor: 'pointer',
                                 }}
-                            >
-                                Cancel
-                            </button>
+                            >Cancel</button>
                             <button
                                 onClick={handleCreateTask}
                                 style={{
-                                    flex: 1,
-                                    fontFamily: 'inherit',
-                                    fontSize: '1rem',
-                                    fontWeight: 500,
-                                    color: '#0a0a0a',
-                                    background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                                    border: 'none',
-                                    padding: '0.75rem',
-                                    borderRadius: '0.5rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
+                                    flex: 1, fontFamily: 'inherit', fontSize: '1rem', fontWeight: 500,
+                                    color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                                    border: 'none', padding: '0.75rem', borderRadius: '0.5rem', cursor: 'pointer',
                                 }}
-                            >
-                                Create Task
-                            </button>
+                            >Create Task</button>
                         </div>
                     </div>
                 </div>
