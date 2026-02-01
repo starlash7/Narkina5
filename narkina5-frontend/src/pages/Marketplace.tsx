@@ -2,7 +2,18 @@ import { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useSolana } from '../contexts/SolanaContext';
 import { fetchTasks, taskToDisplay, type TaskDisplay } from '../services/agenc';
+import {
+    buildRegisterAgentTx,
+    buildCreateTaskTx,
+    generateTaskId,
+    deriveAgentIdFromWallet,
+    stringToFixed64,
+    categoryToCapability,
+    checkProtocolInitialized,
+} from '../services/transactions';
 import { PlusIcon, ClockIcon, SolIcon, RefreshIcon, ChainIcon } from '../components/Icons';
+
+type TxStatus = 'idle' | 'registering' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 
 // Task categories mapped to training specializations
 const SPECIALIZATIONS = ['Compute', 'Inference', 'Security', 'Network', 'Storage'];
@@ -61,7 +72,7 @@ const DEMO_TASKS: TaskDisplay[] = [
 
 export function Marketplace() {
     const { authenticated, login } = usePrivy();
-    const { connection, network } = useSolana();
+    const { connection, publicKey, network, sendTransaction, isAgentRegistered, checkAgentStatus } = useSolana();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [tasks, setTasks] = useState<TaskDisplay[]>(DEMO_TASKS);
     const [filter, setFilter] = useState<'all' | 'open' | 'in_progress'>('all');
@@ -73,6 +84,9 @@ export function Marketplace() {
         reward: '',
         category: 'Compute',
     });
+    const [txStatus, setTxStatus] = useState<TxStatus>('idle');
+    const [txSignature, setTxSignature] = useState<string | null>(null);
+    const [txError, setTxError] = useState<string | null>(null);
 
     useEffect(() => {
         loadOnChainTasks();
@@ -103,25 +117,76 @@ export function Marketplace() {
         return task.status === filter;
     });
 
-    const handleCreateTask = () => {
+    const handleCreateTask = async () => {
         if (!newTask.title || !newTask.description || !newTask.reward) return;
+        if (!publicKey) { login(); return; }
 
-        const task: TaskDisplay = {
-            id: `local_${Date.now()}`,
-            title: newTask.title,
-            description: newTask.description,
-            reward: parseFloat(newTask.reward),
-            creator: 'You',
-            status: 'open',
-            createdAt: 'Just now',
-            category: newTask.category,
-            pda: '',
-            onChain: false,
-        };
+        setTxError(null);
+        setTxSignature(null);
 
-        setTasks([task, ...tasks]);
-        setNewTask({ title: '', description: '', reward: '', category: 'Compute' });
-        setShowCreateModal(false);
+        try {
+            setTxStatus('building');
+
+            const protocolReady = await checkProtocolInitialized(connection);
+            if (!protocolReady) {
+                throw new Error('AgenC protocol not initialized on devnet. Deploy the program first.');
+            }
+
+            const agentId = deriveAgentIdFromWallet(publicKey);
+
+            // Register agent if not already registered
+            if (!isAgentRegistered) {
+                setTxStatus('registering');
+                const registerTx = await buildRegisterAgentTx(
+                    connection,
+                    publicKey,
+                    agentId,
+                    categoryToCapability(newTask.category),
+                    'https://narkina5.factory',
+                    null,
+                    0n,
+                );
+                await sendTransaction(registerTx);
+                await checkAgentStatus();
+            }
+
+            // Build create task transaction
+            setTxStatus('signing');
+            const taskId = generateTaskId();
+            const rewardLamports = BigInt(Math.floor(parseFloat(newTask.reward) * 1e9));
+            const deadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 3600);
+
+            const createTx = await buildCreateTaskTx(
+                connection,
+                publicKey,
+                agentId,
+                taskId,
+                categoryToCapability(newTask.category),
+                stringToFixed64(newTask.title),
+                rewardLamports,
+                1,
+                deadline,
+                0,
+                null,
+            );
+
+            setTxStatus('confirming');
+            const sig = await sendTransaction(createTx);
+
+            setTxSignature(sig);
+            setTxStatus('success');
+
+            setNewTask({ title: '', description: '', reward: '', category: 'Compute' });
+
+            setTimeout(() => {
+                loadOnChainTasks();
+            }, 2000);
+
+        } catch (err: unknown) {
+            console.error('Transaction failed:', err);
+            setTxError(err instanceof Error ? err.message : 'Transaction failed');
+            setTxStatus('error');
+        }
     };
 
     const handleClaimTask = (taskId: string) => {
@@ -526,95 +591,219 @@ export function Marketplace() {
                         maxHeight: '90vh',
                         overflow: 'auto',
                     }}>
-                        <h2 style={{
-                            fontSize: '1.25rem',
-                            fontWeight: 300,
-                            color: '#e5e5e5',
-                            margin: '0 0 1.5rem 0',
-                            letterSpacing: '0.05em',
-                        }}>New Training Task</h2>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Task Name</label>
-                                <input
-                                    type="text"
-                                    value={newTask.title}
-                                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                                    placeholder="What should the agent do?"
-                                    style={{
-                                        width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
-                                        border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
-                                        color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
-                                    }}
-                                />
+                        {txStatus !== 'idle' && txStatus !== 'error' && txStatus !== 'success' ? (
+                            /* Transaction Progress */
+                            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                                <div style={{
+                                    width: '3rem', height: '3rem', margin: '0 auto 1.5rem',
+                                    border: '2px solid rgba(255, 107, 53, 0.2)',
+                                    borderTopColor: '#ff6b35',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1s linear infinite',
+                                }} />
+                                <p style={{ color: '#e5e5e5', fontSize: '1rem', margin: '0 0 0.5rem 0', fontWeight: 500 }}>
+                                    {txStatus === 'registering' && 'Registering Agent...'}
+                                    {txStatus === 'building' && 'Building Transaction...'}
+                                    {txStatus === 'signing' && 'Approve in Wallet...'}
+                                    {txStatus === 'confirming' && 'Confirming On-Chain...'}
+                                </p>
+                                <p style={{ color: '#6b7280', fontSize: '0.8rem', margin: 0 }}>
+                                    {txStatus === 'registering' && 'First-time agent registration required'}
+                                    {txStatus === 'building' && 'Preparing your task for the network'}
+                                    {txStatus === 'signing' && 'Check your wallet for the approval prompt'}
+                                    {txStatus === 'confirming' && 'Waiting for network confirmation'}
+                                </p>
                             </div>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Description</label>
-                                <textarea
-                                    value={newTask.description}
-                                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                                    placeholder="Describe the task requirements and success criteria"
-                                    rows={3}
-                                    style={{
-                                        width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
-                                        border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
-                                        color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
-                                    }}
-                                />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Reward (SOL)</label>
-                                    <input
-                                        type="number" step="0.1" min="0.1"
-                                        value={newTask.reward}
-                                        onChange={(e) => setNewTask({ ...newTask, reward: e.target.value })}
-                                        placeholder="0.0"
-                                        style={{
-                                            width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
-                                            border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
-                                            color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
-                                        }}
-                                    />
+                        ) : txStatus === 'success' ? (
+                            /* Success */
+                            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                                <div style={{
+                                    width: '3rem', height: '3rem', margin: '0 auto 1rem',
+                                    borderRadius: '50%',
+                                    background: 'rgba(34, 197, 94, 0.1)',
+                                    border: '2px solid rgba(34, 197, 94, 0.3)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: '#22c55e', fontSize: '1.5rem',
+                                }}>
+                                    &#10003;
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Specialization</label>
-                                    <select
-                                        value={newTask.category}
-                                        onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                                <p style={{ color: '#22c55e', fontSize: '1rem', margin: '0 0 0.5rem 0', fontWeight: 500 }}>
+                                    Task Created On-Chain
+                                </p>
+                                {txSignature && (
+                                    <a
+                                        href={`https://solscan.io/tx/${txSignature}?cluster=devnet`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         style={{
-                                            width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
-                                            border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
-                                            color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                                            display: 'inline-block',
+                                            color: '#3b82f6',
+                                            fontSize: '0.8rem',
+                                            marginBottom: '1.5rem',
+                                            textDecoration: 'none',
                                         }}
                                     >
-                                        {SPECIALIZATIONS.map(s => (
-                                            <option key={s} value={s}>{s}</option>
-                                        ))}
-                                    </select>
+                                        View on Solscan &rarr;
+                                    </a>
+                                )}
+                                <div>
+                                    <button
+                                        onClick={() => { setShowCreateModal(false); setTxStatus('idle'); }}
+                                        style={{
+                                            fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
+                                            color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                                            border: 'none', padding: '0.625rem 1.5rem', borderRadius: '0.375rem', cursor: 'pointer',
+                                        }}
+                                    >Done</button>
                                 </div>
                             </div>
-                        </div>
+                        ) : txStatus === 'error' ? (
+                            /* Error */
+                            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                                <div style={{
+                                    width: '3rem', height: '3rem', margin: '0 auto 1rem',
+                                    borderRadius: '50%',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '2px solid rgba(239, 68, 68, 0.3)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: '#ef4444', fontSize: '1.25rem',
+                                }}>
+                                    &#10007;
+                                </div>
+                                <p style={{ color: '#ef4444', fontSize: '1rem', margin: '0 0 0.5rem 0', fontWeight: 500 }}>
+                                    Transaction Failed
+                                </p>
+                                <p style={{ color: '#6b7280', fontSize: '0.8rem', margin: '0 0 1.5rem 0', wordBreak: 'break-word' }}>
+                                    {txError}
+                                </p>
+                                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                                    <button
+                                        onClick={() => { setTxStatus('idle'); setTxError(null); }}
+                                        style={{
+                                            fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
+                                            color: '#6b7280', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.08)',
+                                            padding: '0.625rem 1.25rem', borderRadius: '0.375rem', cursor: 'pointer',
+                                        }}
+                                    >Back</button>
+                                    <button
+                                        onClick={handleCreateTask}
+                                        style={{
+                                            fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
+                                            color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                                            border: 'none', padding: '0.625rem 1.25rem', borderRadius: '0.375rem', cursor: 'pointer',
+                                        }}
+                                    >Retry</button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Form */
+                            <>
+                                <h2 style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 300,
+                                    color: '#e5e5e5',
+                                    margin: '0 0 1.5rem 0',
+                                    letterSpacing: '0.05em',
+                                }}>New Training Task</h2>
 
-                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-                            <button
-                                onClick={() => setShowCreateModal(false)}
-                                style={{
-                                    flex: 1, fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
-                                    color: '#6b7280', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    padding: '0.625rem', borderRadius: '0.375rem', cursor: 'pointer',
-                                }}
-                            >Cancel</button>
-                            <button
-                                onClick={handleCreateTask}
-                                style={{
-                                    flex: 1, fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
-                                    color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                                    border: 'none', padding: '0.625rem', borderRadius: '0.375rem', cursor: 'pointer',
-                                }}
-                            >Create Task</button>
-                        </div>
+                                {!isAgentRegistered && publicKey && (
+                                    <div style={{
+                                        padding: '0.625rem 0.875rem',
+                                        borderRadius: '0.375rem',
+                                        background: 'rgba(234, 179, 8, 0.06)',
+                                        border: '1px solid rgba(234, 179, 8, 0.15)',
+                                        marginBottom: '1rem',
+                                        fontSize: '0.75rem',
+                                        color: '#eab308',
+                                    }}>
+                                        Agent not registered. Registration tx will be sent first.
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Task Name</label>
+                                        <input
+                                            type="text"
+                                            value={newTask.title}
+                                            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                                            placeholder="What should the agent do?"
+                                            maxLength={64}
+                                            style={{
+                                                width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
+                                                border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
+                                                color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Description</label>
+                                        <textarea
+                                            value={newTask.description}
+                                            onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                                            placeholder="Describe the task requirements and success criteria"
+                                            rows={3}
+                                            style={{
+                                                width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
+                                                border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
+                                                color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Reward (SOL)</label>
+                                            <input
+                                                type="number" step="0.1" min="0.1"
+                                                value={newTask.reward}
+                                                onChange={(e) => setNewTask({ ...newTask, reward: e.target.value })}
+                                                placeholder="0.0"
+                                                style={{
+                                                    width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
+                                                    border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
+                                                    color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Specialization</label>
+                                            <select
+                                                value={newTask.category}
+                                                onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+                                                style={{
+                                                    width: '100%', padding: '0.625rem 0.75rem', borderRadius: '0.375rem',
+                                                    border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(26, 26, 26, 0.6)',
+                                                    color: '#e5e5e5', fontSize: '0.875rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                                                }}
+                                            >
+                                                {SPECIALIZATIONS.map(s => (
+                                                    <option key={s} value={s}>{s}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                                    <button
+                                        onClick={() => setShowCreateModal(false)}
+                                        style={{
+                                            flex: 1, fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
+                                            color: '#6b7280', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.08)',
+                                            padding: '0.625rem', borderRadius: '0.375rem', cursor: 'pointer',
+                                        }}
+                                    >Cancel</button>
+                                    <button
+                                        onClick={handleCreateTask}
+                                        style={{
+                                            flex: 1, fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 500,
+                                            color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
+                                            border: 'none', padding: '0.625rem', borderRadius: '0.375rem', cursor: 'pointer',
+                                        }}
+                                    >Create On-Chain</button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

@@ -11,8 +11,10 @@ const SEEDS = {
     ESCROW: Buffer.from('escrow'),
 } as const;
 
-const U64_SIZE = 8;
 const DISCRIMINATOR_SIZE = 8;
+
+// Account size: 8 + 32 + 32 + 8 + 64 + 32 + 8 + 1 + 1 + 1 + 1 + 8 + 8 + 8 + 32 + 64 + 1 + 1 + 1 + 32 = 333
+const TASK_ACCOUNT_SIZE = 333;
 
 // ── Task State ─────────────────────────────────────────
 export const TaskState = {
@@ -35,16 +37,49 @@ export const TaskStateLabels: Record<TaskState, string> = {
     [TaskState.Disputed]: 'disputed',
 };
 
+// ── Task Type ──────────────────────────────────────────
+export const TaskType = {
+    Exclusive: 0,
+    Collaborative: 1,
+    Competitive: 2,
+} as const;
+
+// ── Capability Bitmasks ────────────────────────────────
+const CAPABILITY_LABELS: Record<number, string> = {
+    1: 'Compute',
+    2: 'Storage',
+    4: 'Inference',
+    8: 'Network',
+    16: 'Coordinator',
+};
+
+function primaryCapability(bitmask: bigint): string {
+    for (const [bit, label] of Object.entries(CAPABILITY_LABELS)) {
+        if (bitmask & BigInt(bit)) return label;
+    }
+    return 'Compute';
+}
+
 // ── Interfaces ─────────────────────────────────────────
 export interface TaskAccount {
-    taskId: number;
-    state: TaskState;
+    taskId: Uint8Array;
     creator: PublicKey;
-    escrowLamports: number;
-    deadline: number;
+    requiredCapabilities: bigint;
     description: string;
-    claimedBy: PublicKey | null;
-    completedAt: number | null;
+    constraintHash: Uint8Array;
+    rewardAmount: bigint;
+    maxWorkers: number;
+    currentWorkers: number;
+    status: TaskState;
+    taskType: number;
+    createdAt: number;
+    deadline: number;
+    completedAt: number;
+    escrow: PublicKey;
+    result: Uint8Array;
+    completions: number;
+    requiredCompletions: number;
+    bump: number;
     pda: PublicKey;
 }
 
@@ -62,12 +97,17 @@ export interface TaskDisplay {
 }
 
 // ── PDA Derivation ─────────────────────────────────────
-export function deriveTaskPda(taskId: number): PublicKey {
-    const taskIdBuffer = Buffer.alloc(U64_SIZE);
-    taskIdBuffer.writeBigUInt64LE(BigInt(taskId));
-
+export function deriveTaskPda(creator: PublicKey, taskId: Uint8Array): PublicKey {
     const [pda] = PublicKey.findProgramAddressSync(
-        [SEEDS.TASK, taskIdBuffer],
+        [SEEDS.TASK, creator.toBuffer(), Buffer.from(taskId)],
+        PROGRAM_ID
+    );
+    return pda;
+}
+
+export function deriveAgentPda(agentId: Uint8Array): PublicKey {
+    const [pda] = PublicKey.findProgramAddressSync(
+        [SEEDS.AGENT, Buffer.from(agentId)],
         PROGRAM_ID
     );
     return pda;
@@ -98,69 +138,105 @@ export function deriveProtocolPda(): PublicKey {
 }
 
 // ── Account Deserialization ────────────────────────────
-// Anchor account discriminator for "Task" (first 8 bytes of sha256("account:Task"))
+// Matches Task struct from agenc-coordination state.rs (all fixed-size fields)
 function parseTaskAccount(data: Buffer, pda: PublicKey): TaskAccount | null {
     try {
-        // Skip 8-byte discriminator
+        if (data.length < TASK_ACCOUNT_SIZE) return null;
+
         let offset = DISCRIMINATOR_SIZE;
 
-        // task_id: u64
-        const taskId = Number(data.readBigUInt64LE(offset));
-        offset += 8;
+        // task_id: [u8; 32]
+        const taskId = new Uint8Array(data.subarray(offset, offset + 32));
+        offset += 32;
 
-        // state: u8 (enum)
-        const state = data.readUInt8(offset) as TaskState;
-        offset += 1;
-
-        // creator: Pubkey (32 bytes)
+        // creator: Pubkey
         const creator = new PublicKey(data.subarray(offset, offset + 32));
         offset += 32;
 
-        // escrow_lamports: u64
-        const escrowLamports = Number(data.readBigUInt64LE(offset));
+        // required_capabilities: u64
+        const requiredCapabilities = data.readBigUInt64LE(offset);
+        offset += 8;
+
+        // description: [u8; 64]
+        const descBytes = data.subarray(offset, offset + 64);
+        const nullIdx = descBytes.indexOf(0);
+        const description = descBytes.subarray(0, nullIdx === -1 ? 64 : nullIdx).toString('utf-8');
+        offset += 64;
+
+        // constraint_hash: [u8; 32]
+        const constraintHash = new Uint8Array(data.subarray(offset, offset + 32));
+        offset += 32;
+
+        // reward_amount: u64
+        const rewardAmount = data.readBigUInt64LE(offset);
+        offset += 8;
+
+        // max_workers: u8
+        const maxWorkers = data.readUInt8(offset);
+        offset += 1;
+
+        // current_workers: u8
+        const currentWorkers = data.readUInt8(offset);
+        offset += 1;
+
+        // status: u8 (TaskStatus enum)
+        const status = data.readUInt8(offset) as TaskState;
+        offset += 1;
+
+        // task_type: u8 (TaskType enum)
+        const taskType = data.readUInt8(offset);
+        offset += 1;
+
+        // created_at: i64
+        const createdAt = Number(data.readBigInt64LE(offset));
         offset += 8;
 
         // deadline: i64
         const deadline = Number(data.readBigInt64LE(offset));
         offset += 8;
 
-        // description: String (4 bytes length prefix + data)
-        const descLen = data.readUInt32LE(offset);
-        offset += 4;
-        const description = data.subarray(offset, offset + descLen).toString('utf-8');
-        offset += descLen;
+        // completed_at: i64
+        const completedAt = Number(data.readBigInt64LE(offset));
+        offset += 8;
 
-        // constraint_hash: Option<[u8; 32]> - 1 byte tag + optional 32 bytes
-        const hasConstraint = data.readUInt8(offset) === 1;
-        offset += 1;
-        if (hasConstraint) offset += 32;
+        // escrow: Pubkey
+        const escrow = new PublicKey(data.subarray(offset, offset + 32));
+        offset += 32;
 
-        // claimed_by: Option<Pubkey> - 1 byte tag + optional 32 bytes
-        const hasClaimed = data.readUInt8(offset) === 1;
-        offset += 1;
-        let claimedBy: PublicKey | null = null;
-        if (hasClaimed) {
-            claimedBy = new PublicKey(data.subarray(offset, offset + 32));
-            offset += 32;
-        }
+        // result: [u8; 64]
+        const result = new Uint8Array(data.subarray(offset, offset + 64));
+        offset += 64;
 
-        // completed_at: Option<i64> - 1 byte tag + optional 8 bytes
-        const hasCompleted = data.readUInt8(offset) === 1;
+        // completions: u8
+        const completions = data.readUInt8(offset);
         offset += 1;
-        let completedAt: number | null = null;
-        if (hasCompleted) {
-            completedAt = Number(data.readBigInt64LE(offset));
-        }
+
+        // required_completions: u8
+        const requiredCompletions = data.readUInt8(offset);
+        offset += 1;
+
+        // bump: u8
+        const bump = data.readUInt8(offset);
 
         return {
             taskId,
-            state,
             creator,
-            escrowLamports,
-            deadline,
+            requiredCapabilities,
             description,
-            claimedBy,
+            constraintHash,
+            rewardAmount,
+            maxWorkers,
+            currentWorkers,
+            status,
+            taskType,
+            createdAt,
+            deadline,
             completedAt,
+            escrow,
+            result,
+            completions,
+            requiredCompletions,
+            bump,
             pda,
         };
     } catch (e) {
@@ -170,76 +246,71 @@ function parseTaskAccount(data: Buffer, pda: PublicKey): TaskAccount | null {
 }
 
 // ── Fetch Tasks ────────────────────────────────────────
-export async function fetchTasks(
-    connection: Connection,
-    maxTaskId: number = 50
-): Promise<TaskAccount[]> {
+export async function fetchTasks(connection: Connection): Promise<TaskAccount[]> {
+    // Use getProgramAccounts with dataSize filter since task PDAs include
+    // creator key and random task_id (can't iterate sequentially)
+    const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+        filters: [{ dataSize: TASK_ACCOUNT_SIZE }],
+    });
+
     const tasks: TaskAccount[] = [];
-
-    // Batch fetch: derive PDAs for task IDs 0..maxTaskId and check which exist
-    const pdas = Array.from({ length: maxTaskId }, (_, i) => deriveTaskPda(i));
-
-    // Fetch all accounts in one batch
-    const accounts = await connection.getMultipleAccountsInfo(pdas);
-
-    for (let i = 0; i < accounts.length; i++) {
-        const accountInfo = accounts[i];
-        if (accountInfo && accountInfo.owner.equals(PROGRAM_ID)) {
-            const task = parseTaskAccount(
-                Buffer.from(accountInfo.data),
-                pdas[i]
-            );
-            if (task) tasks.push(task);
-        }
+    for (const { pubkey, account } of accounts) {
+        const task = parseTaskAccount(Buffer.from(account.data), pubkey);
+        if (task) tasks.push(task);
     }
 
+    // Sort by created_at descending (newest first)
+    tasks.sort((a, b) => b.createdAt - a.createdAt);
     return tasks;
-}
-
-export async function fetchTaskById(
-    connection: Connection,
-    taskId: number
-): Promise<TaskAccount | null> {
-    const pda = deriveTaskPda(taskId);
-    const accountInfo = await connection.getAccountInfo(pda);
-
-    if (!accountInfo || !accountInfo.owner.equals(PROGRAM_ID)) {
-        return null;
-    }
-
-    return parseTaskAccount(Buffer.from(accountInfo.data), pda);
 }
 
 export async function fetchTasksByCreator(
     connection: Connection,
     creator: PublicKey,
-    maxTaskId: number = 50
 ): Promise<TaskAccount[]> {
-    const allTasks = await fetchTasks(connection, maxTaskId);
-    return allTasks.filter(t => t.creator.equals(creator));
+    // Filter by creator at offset 40 (8 disc + 32 taskId = 40)
+    const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+        filters: [
+            { dataSize: TASK_ACCOUNT_SIZE },
+            { memcmp: { offset: 40, bytes: creator.toBase58() } },
+        ],
+    });
+
+    const tasks: TaskAccount[] = [];
+    for (const { pubkey, account } of accounts) {
+        const task = parseTaskAccount(Buffer.from(account.data), pubkey);
+        if (task) tasks.push(task);
+    }
+
+    tasks.sort((a, b) => b.createdAt - a.createdAt);
+    return tasks;
 }
 
 // ── Convert to Display Format ──────────────────────────
-const CATEGORIES = ['Compute', 'Inference', 'Security', 'Network', 'Storage'];
+function taskIdHex(taskId: Uint8Array): string {
+    return Array.from(taskId.slice(0, 8))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+function relativeTime(timestamp: number): string {
+    const age = Date.now() / 1000 - timestamp;
+    if (age < 60) return 'just now';
+    if (age < 3600) return `${Math.floor(age / 60)}m ago`;
+    if (age < 86400) return `${Math.floor(age / 3600)}h ago`;
+    return `${Math.floor(age / 86400)}d ago`;
+}
 
 export function taskToDisplay(task: TaskAccount): TaskDisplay {
-    const now = Date.now() / 1000;
-    const age = now - (task.deadline - 7 * 24 * 3600); // approximate creation time
-    let createdAt: string;
-
-    if (age < 3600) createdAt = `${Math.floor(age / 60)}m ago`;
-    else if (age < 86400) createdAt = `${Math.floor(age / 3600)}h ago`;
-    else createdAt = `${Math.floor(age / 86400)}d ago`;
-
     return {
-        id: `task_${task.taskId}`,
-        title: task.description || `Task #${task.taskId}`,
+        id: taskIdHex(task.taskId),
+        title: task.description || `Task ${taskIdHex(task.taskId)}`,
         description: task.description,
-        reward: task.escrowLamports / LAMPORTS_PER_SOL,
+        reward: Number(task.rewardAmount) / LAMPORTS_PER_SOL,
         creator: `${task.creator.toBase58().slice(0, 4)}...${task.creator.toBase58().slice(-4)}`,
-        status: TaskStateLabels[task.state],
-        createdAt,
-        category: CATEGORIES[task.taskId % CATEGORIES.length],
+        status: TaskStateLabels[task.status],
+        createdAt: relativeTime(task.createdAt),
+        category: primaryCapability(task.requiredCapabilities),
         pda: task.pda.toBase58(),
         onChain: true,
     };

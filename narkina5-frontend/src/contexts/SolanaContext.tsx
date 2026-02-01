@@ -1,8 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { usePrivy } from '@privy-io/react-auth';
+import { useWallets, useSignTransaction } from '@privy-io/react-auth/solana';
+import { checkAgentRegistered, deriveAgentIdFromWallet } from '../services/transactions';
 
-// AgenC Program ID (deployed on devnet/mainnet)
+// AgenC Program ID (deployed on devnet)
 const AGENC_PROGRAM_ID = 'EopUaCV2svxj9j4hd7KjbrWfdjkspmm2BCBe7jGpKzKZ';
 
 interface SolanaContextType {
@@ -13,6 +15,9 @@ interface SolanaContextType {
     error: string | null;
     refreshBalance: () => Promise<void>;
     network: 'devnet' | 'mainnet';
+    sendTransaction: (serializedTx: Uint8Array) => Promise<string>;
+    isAgentRegistered: boolean;
+    checkAgentStatus: () => Promise<void>;
 }
 
 const SolanaContext = createContext<SolanaContextType | null>(null);
@@ -23,11 +28,14 @@ const RPC_ENDPOINT = 'https://api.devnet.solana.com';
 
 export function SolanaProvider({ children }: { children: ReactNode }) {
     const { user, authenticated } = usePrivy();
+    const { wallets } = useWallets();
+    const { signTransaction } = useSignTransaction();
     const [connection] = useState(() => new Connection(RPC_ENDPOINT, 'confirmed'));
     const [publicKey, setPublicKey] = useState<PublicKey | null>(null);
     const [balance, setBalance] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isAgentRegistered, setIsAgentRegistered] = useState(false);
 
     // Get wallet address from Privy user
     useEffect(() => {
@@ -44,17 +52,19 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
         } else {
             setPublicKey(null);
             setBalance(null);
+            setIsAgentRegistered(false);
         }
     }, [authenticated, user?.wallet?.address]);
 
-    // Fetch balance when publicKey changes
+    // Fetch balance and agent status when publicKey changes
     useEffect(() => {
         if (publicKey) {
             refreshBalance();
+            checkAgentStatus();
         }
     }, [publicKey]);
 
-    const refreshBalance = async () => {
+    const refreshBalance = useCallback(async () => {
         if (!publicKey) return;
 
         setIsLoading(true);
@@ -70,7 +80,41 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [publicKey, connection]);
+
+    const checkAgentStatus = useCallback(async () => {
+        if (!publicKey) return;
+        try {
+            const agentId = deriveAgentIdFromWallet(publicKey);
+            const registered = await checkAgentRegistered(connection, agentId);
+            setIsAgentRegistered(registered);
+        } catch (err) {
+            console.error('Failed to check agent status:', err);
+            setIsAgentRegistered(false);
+        }
+    }, [publicKey, connection]);
+
+    const sendTransaction = useCallback(async (serializedTx: Uint8Array): Promise<string> => {
+        const wallet = wallets.find(w => w.address === publicKey?.toBase58());
+        if (!wallet) throw new Error('No wallet connected');
+
+        // Sign with Privy wallet
+        const { signedTransaction } = await signTransaction({
+            transaction: serializedTx,
+            wallet,
+            chain: 'solana:devnet',
+        });
+
+        // Send and confirm
+        const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+        const signature = await connection.sendRawTransaction(signedTransaction);
+        await connection.confirmTransaction({
+            signature,
+            ...latestBlockhash,
+        }, 'confirmed');
+
+        return signature;
+    }, [wallets, publicKey, signTransaction, connection]);
 
     return (
         <SolanaContext.Provider
@@ -82,6 +126,9 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
                 error,
                 refreshBalance,
                 network: NETWORK,
+                sendTransaction,
+                isAgentRegistered,
+                checkAgentStatus,
             }}
         >
             {children}
