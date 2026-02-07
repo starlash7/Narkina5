@@ -39,7 +39,7 @@ function agentApiProxy(): Plugin {
             }),
           });
 
-          const data: Record<string, unknown> = await resp.json();
+          const data = await resp.json() as { content?: Array<{ text?: string }>; model?: string; usage?: unknown };
           res.setHeader('Content-Type', 'application/json');
 
           if (!resp.ok) {
@@ -48,10 +48,9 @@ function agentApiProxy(): Plugin {
             return;
           }
 
-          const content = data.content as Array<{ text?: string }> | undefined;
           res.statusCode = 200;
           res.end(JSON.stringify({
-            result: content?.[0]?.text || 'Task completed.',
+            result: data.content?.[0]?.text || 'Task completed.',
             model: data.model,
             usage: data.usage,
           }));
