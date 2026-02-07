@@ -139,7 +139,7 @@ export function Footer() {
                         fontSize: '0.75rem',
                         margin: 0,
                     }}>
-                        © {currentYear} Narkina5. Building the future of decentralized AI.
+                        © {currentYear} Narkina5. Powered by <span style={{ color: '#ff6b35', fontWeight: 600 }}>Pix7</span>
                     </p>
 
                     {/* Social Links */}
