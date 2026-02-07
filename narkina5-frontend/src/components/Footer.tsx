@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TwitterIcon, GithubIcon, DiscordIcon } from './Icons';
+import { TwitterIcon, GithubIcon } from './Icons';
 
 export function Footer() {
     const currentYear = new Date().getFullYear();
@@ -10,30 +10,14 @@ export function Footer() {
             links: [
                 { label: 'Training Floor', to: '/marketplace' },
                 { label: 'My Agents', to: '/dashboard' },
-                { label: 'Documentation', to: '#' },
-            ],
-        },
-        {
-            title: 'Company',
-            links: [
                 { label: 'About', to: '/about' },
-                { label: 'Blog', to: '#' },
-                { label: 'Careers', to: '#' },
-            ],
-        },
-        {
-            title: 'Legal',
-            links: [
-                { label: 'Privacy', to: '#' },
-                { label: 'Terms', to: '#' },
             ],
         },
     ];
 
     const socialLinks = [
         { icon: <TwitterIcon />, href: 'https://twitter.com', label: 'Twitter' },
-        { icon: <GithubIcon />, href: 'https://github.com', label: 'GitHub' },
-        { icon: <DiscordIcon />, href: 'https://discord.com', label: 'Discord' },
+        { icon: <GithubIcon />, href: 'https://github.com/starlash7/Narkina5', label: 'GitHub' },
     ];
 
     return (
