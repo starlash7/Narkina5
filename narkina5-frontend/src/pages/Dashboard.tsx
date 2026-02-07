@@ -57,7 +57,7 @@ export function Dashboard() {
 
     const [trainStatus, setTrainStatus] = useState<TrainStatus>('idle');
     const [trainLog, setTrainLog] = useState<string[]>([]);
-    const [trainError, setTrainError] = useState<string | null>(null);
+    const [, setTrainError] = useState<string | null>(null);
     const [completedTasks, setCompletedTasks] = useState(0);
 
     const [gradStatus, setGradStatus] = useState<GradStatus>('idle');
