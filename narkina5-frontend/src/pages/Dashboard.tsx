@@ -15,12 +15,25 @@ import {
     type GraduatedAgent,
     type AgentGraduationData,
 } from '../services/pumpfun';
+import { executeTrainingTask, parseExecutionSteps } from '../services/agent';
 import { WalletIcon, ChartIcon, TaskIcon, ExternalLinkIcon } from '../components/Icons';
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
+type TrainStatus = 'idle' | 'running' | 'done' | 'error';
 
 const GRADUATION_THRESHOLD = 100;
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
+
+const TRAINING_TASKS = [
+    { title: 'Data Pipeline Assembly', desc: 'Process and analyze raw blockchain data streams' },
+    { title: 'Smart Contract Audit', desc: 'Review DeFi protocol for vulnerabilities' },
+    { title: 'Sentiment Analysis', desc: 'Analyze social media data for market signals' },
+    { title: 'Network Optimization', desc: 'Optimize RPC endpoint routing and latency' },
+    { title: 'Token Metrics Analysis', desc: 'Evaluate on-chain token health metrics' },
+    { title: 'Mempool Monitoring', desc: 'Monitor and classify pending transactions' },
+    { title: 'Wallet Clustering', desc: 'Identify related wallets through transaction patterns' },
+    { title: 'Liquidity Assessment', desc: 'Analyze DEX pool depth and stability' },
+];
 
 const SPEC_COLORS: Record<string, string> = {
     Compute: '#ff6b35',
@@ -41,6 +54,11 @@ export function Dashboard() {
     const [agentDescription, setAgentDescription] = useState('');
     const [specialization, setSpecialization] = useState('Compute');
     const [trustScore, setTrustScore] = useState(0);
+
+    const [trainStatus, setTrainStatus] = useState<TrainStatus>('idle');
+    const [trainLog, setTrainLog] = useState<string[]>([]);
+    const [trainError, setTrainError] = useState<string | null>(null);
+    const [completedTasks, setCompletedTasks] = useState(0);
 
     const [gradStatus, setGradStatus] = useState<GradStatus>('idle');
     const [gradError, setGradError] = useState<string | null>(null);
@@ -69,8 +87,34 @@ export function Dashboard() {
 
     const canGraduate = trustScore >= GRADUATION_THRESHOLD && agentName && agentSymbol;
 
-    const handleSimulateTraining = () => {
-        setTrustScore(prev => Math.min(prev + 25, 100));
+    const handleRunTraining = async () => {
+        if (!agentName || trustScore >= 100 || trainStatus === 'running') return;
+
+        const task = TRAINING_TASKS[completedTasks % TRAINING_TASKS.length];
+        setTrainStatus('running');
+        setTrainError(null);
+        setTrainLog([`> Assigning task: ${task.title}`, `> Agent ${agentName} initializing...`]);
+
+        try {
+            const result = await executeTrainingTask({
+                agentName,
+                specialization,
+                taskTitle: task.title,
+                taskDescription: task.desc,
+            });
+
+            const steps = parseExecutionSteps(result.result);
+            setTrainLog(prev => [...prev, ...steps.map(s => `  ${s}`)]);
+            setTrainLog(prev => [...prev, '', `> Task complete. Trust +25 earned.`]);
+            setTrustScore(prev => Math.min(prev + 25, 100));
+            setCompletedTasks(prev => prev + 1);
+            setTrainStatus('done');
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Training failed';
+            setTrainError(msg);
+            setTrainLog(prev => [...prev, `> ERROR: ${msg}`]);
+            setTrainStatus('error');
+        }
     };
 
     const handleGraduate = async () => {
@@ -233,6 +277,17 @@ export function Dashboard() {
                         <p style={{ fontSize: '0.7rem', color: '#eab308', margin: '0.25rem 0 0 0' }}>{network}</p>
                     </div>
 
+                    <div style={cardStyle('#3b82f6')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                            <span style={{ color: '#3b82f6' }}><TaskIcon /></span>
+                            <span style={statLabel}>Tasks Done</span>
+                        </div>
+                        <p style={{ fontSize: '1.5rem', fontWeight: 600, color: '#3b82f6', margin: 0 }}>
+                            {completedTasks}
+                        </p>
+                        <p style={{ fontSize: '0.7rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>AI training runs</p>
+                    </div>
+
                     <div style={cardStyle('#8b5cf6')}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <span style={{ color: '#8b5cf6' }}><ChartIcon /></span>
@@ -339,20 +394,45 @@ export function Dashboard() {
                             </div>
                         </div>
 
+                        {/* Training Log */}
+                        {trainLog.length > 0 && (
+                            <div style={{
+                                marginTop: '1rem', padding: '0.75rem',
+                                borderRadius: '0.375rem', background: 'rgba(0,0,0,0.4)',
+                                border: '1px solid rgba(255,255,255,0.04)',
+                                maxHeight: '150px', overflowY: 'auto',
+                                fontFamily: '"JetBrains Mono", monospace',
+                            }}>
+                                {trainLog.map((line, i) => (
+                                    <div key={i} style={{
+                                        fontSize: '0.7rem', lineHeight: 1.6,
+                                        color: line.startsWith('> ERROR') ? '#ef4444'
+                                            : line.startsWith('> Task complete') ? '#22c55e'
+                                            : line.startsWith('>') ? '#ff6b35' : '#9ca3af',
+                                    }}>{line}</div>
+                                ))}
+                                {trainStatus === 'running' && (
+                                    <div style={{ fontSize: '0.7rem', color: '#ff6b35' }}>
+                                        <span style={{ animation: 'blink 1s infinite' }}>_</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Buttons */}
                         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
                             <button
-                                onClick={handleSimulateTraining}
-                                disabled={trustScore >= 100}
+                                onClick={handleRunTraining}
+                                disabled={trustScore >= 100 || trainStatus === 'running' || !agentName}
                                 style={{
                                     flex: 1, fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 500,
-                                    color: trustScore >= 100 ? '#4b5563' : '#e5e5e5',
-                                    background: 'transparent',
-                                    border: `1px solid ${trustScore >= 100 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)'}`,
+                                    color: (trustScore >= 100 || !agentName) ? '#4b5563' : '#e5e5e5',
+                                    background: trainStatus === 'running' ? 'rgba(255, 107, 53, 0.08)' : 'transparent',
+                                    border: `1px solid ${(trustScore >= 100 || !agentName) ? 'rgba(255,255,255,0.05)' : 'rgba(255, 107, 53, 0.2)'}`,
                                     padding: '0.625rem', borderRadius: '0.375rem',
-                                    cursor: trustScore >= 100 ? 'default' : 'pointer',
+                                    cursor: (trustScore >= 100 || trainStatus === 'running' || !agentName) ? 'default' : 'pointer',
                                 }}
-                            >+25 Trust (Demo)</button>
+                            >{trainStatus === 'running' ? 'Training...' : 'Run Training Task'}</button>
                             <button
                                 onClick={handleGraduate}
                                 disabled={!canGraduate || gradStatus !== 'idle'}
