@@ -216,7 +216,6 @@ export function Header() {
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                     className="hide-desktop"
                     style={{
-                        display: 'none',
                         background: 'transparent',
                         border: 'none',
                         color: '#e5e5e5',
@@ -233,7 +232,6 @@ export function Header() {
                 <div
                     className="animate-slide-down hide-desktop"
                     style={{
-                        display: 'none',
                         position: 'absolute',
                         top: '100%',
                         left: 0,

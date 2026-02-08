@@ -391,7 +391,7 @@ export function Dashboard() {
 
                 {/* ═══ SETUP PHASE ═══ */}
                 {phase === 'setup' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
                         {/* Left: Create Agent Form */}
                         <div style={panelStyle}>
                             <h2 style={panelTitle}>Create Competitors</h2>
@@ -513,7 +513,7 @@ export function Dashboard() {
                                                 <button onClick={() => removeAgent(agent.id)} style={{
                                                     background: 'transparent', border: 'none',
                                                     color: '#6b7280', cursor: 'pointer', fontSize: '1rem',
-                                                    padding: '0.25rem 0.5rem',
+                                                    padding: '0.5rem 0.75rem',
                                                 }}>&times;</button>
                                             </div>
                                         );
@@ -551,13 +551,13 @@ export function Dashboard() {
 
                 {/* ═══ TRAINING PHASE ═══ */}
                 {phase === 'training' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
                         {/* Left: Training Arena */}
                         <div>
                             {/* Agent Cards */}
                             <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: `repeat(${Math.min(agents.length, 3)}, 1fr)`,
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                                 gap: '1rem', marginBottom: '1.5rem',
                             }}>
                                 {agents.map(agent => {
@@ -607,7 +607,7 @@ export function Dashboard() {
                                                         style={{
                                                             fontFamily: 'inherit', fontSize: '0.6rem', fontWeight: 600,
                                                             color: '#0a0a0a', background: '#22c55e',
-                                                            border: 'none', padding: '0.25rem 0.5rem',
+                                                            border: 'none', padding: '0.4rem 0.75rem',
                                                             borderRadius: '0.25rem', cursor: 'pointer',
                                                         }}
                                                     >Graduate</button>
