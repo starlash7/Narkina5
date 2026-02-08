@@ -11,18 +11,49 @@ export interface TrainingResult {
     usage?: { input_tokens: number; output_tokens: number };
 }
 
+export interface BatchTrainingRequest {
+    task: { title: string; description?: string };
+    agents: Array<{ name: string; specialization: string }>;
+}
+
+export interface BatchAgentResult {
+    agentName: string;
+    result: string;
+    score: number;
+    rank: number;
+}
+
+export interface BatchTrainingResult {
+    results: BatchAgentResult[];
+}
+
 /**
- * Execute a training task via the AI agent.
- * In production, calls /api/agent (Vercel serverless).
- * In dev, calls the Anthropic API directly via a local proxy.
+ * Execute a single training task via the AI agent (backward compatible).
  */
 export async function executeTrainingTask(req: TrainingRequest): Promise<TrainingResult> {
-    const apiUrl = import.meta.env.DEV ? '/api/agent' : '/api/agent';
-
-    const response = await fetch(apiUrl, {
+    const response = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(req),
+    });
+
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || `API error: ${response.status}`);
+    }
+
+    return response.json();
+}
+
+/**
+ * Execute batch training for multiple agents competing on the same task.
+ * Returns ranked results with scores.
+ */
+export async function executeBatchTraining(req: BatchTrainingRequest): Promise<BatchTrainingResult> {
+    const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch: true, ...req }),
     });
 
     if (!response.ok) {

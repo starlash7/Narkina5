@@ -1,8 +1,5 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 
-const PUMP_IPFS_ENDPOINT = 'https://pump.fun/api/ipfs';
-const PUMPPORTAL_TRADE_LOCAL = 'https://pumpportal.fun/api/trade-local';
-
 // ── Types ──────────────────────────────────────────────
 export interface AgentGraduationData {
     name: string;
@@ -60,7 +57,16 @@ function generateAgentAvatar(name: string, specialization: string): Blob {
     return new Blob([svg], { type: 'image/svg+xml' });
 }
 
-// ── IPFS Upload ────────────────────────────────────────
+// Convert Blob to base64 for proxy
+async function blobToBase64(blob: Blob): Promise<string> {
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+}
+
+// ── IPFS Upload (via proxy) ────────────────────────────
 export async function uploadMetadata(
     name: string,
     symbol: string,
@@ -68,19 +74,21 @@ export async function uploadMetadata(
     specialization: string,
 ): Promise<string> {
     const imageBlob = generateAgentAvatar(name, specialization);
+    const imageBase64 = await blobToBase64(imageBlob);
 
-    const formData = new FormData();
-    formData.append('file', imageBlob, `${symbol.toLowerCase()}.svg`);
-    formData.append('name', name);
-    formData.append('symbol', symbol);
-    formData.append('description', description);
-    formData.append('twitter', 'https://x.com/narkina5');
-    formData.append('website', 'https://narkina5.factory');
-    formData.append('showName', 'true');
-
-    const response = await fetch(PUMP_IPFS_ENDPOINT, {
+    const response = await fetch('/api/pumpfun?action=ipfs', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            file: imageBase64,
+            fileName: `${symbol.toLowerCase()}.svg`,
+            name,
+            symbol,
+            description,
+            twitter: 'https://x.com/narkina5',
+            website: 'https://narkina5.factory',
+            showName: true,
+        }),
     });
 
     if (!response.ok) {
@@ -96,7 +104,7 @@ export function generateMintKeypair(): Keypair {
     return Keypair.generate();
 }
 
-// ── Build Create Token Tx ──────────────────────────────
+// ── Build Create Token Tx (via proxy) ──────────────────
 export async function buildCreateTokenTx(
     creatorPublicKey: string,
     mintPublicKey: string,
@@ -105,7 +113,7 @@ export async function buildCreateTokenTx(
     tokenSymbol: string,
     initialBuySol: number = 0,
 ): Promise<Uint8Array> {
-    const response = await fetch(PUMPPORTAL_TRADE_LOCAL, {
+    const response = await fetch('/api/pumpfun?action=trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -133,8 +141,6 @@ export async function buildCreateTokenTx(
 }
 
 // ── Sign with Mint Keypair ─────────────────────────────
-// Partially sign the VersionedTransaction with the mint keypair
-// before handing off to the user's wallet for the final signature
 export function signWithMintKeypair(
     txBytes: Uint8Array,
     mintKeypair: Keypair,

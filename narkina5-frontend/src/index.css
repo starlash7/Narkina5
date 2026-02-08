@@ -263,3 +263,8 @@ a, button {
     transform: translate(-50%, 0);
   }
 }
+
+@keyframes slideRight {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
