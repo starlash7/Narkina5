@@ -16,7 +16,7 @@ import { PlusIcon, ClockIcon, SolIcon, RefreshIcon, ChainIcon } from '../compone
 type TxStatus = 'idle' | 'registering' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 
 // Task categories mapped to training specializations
-const SPECIALIZATIONS = ['Compute', 'Inference', 'Security', 'Network', 'Storage'];
+const SPECIALIZATIONS = ['Hyperspace', 'Holocron', 'Garrison', 'Holonet', 'Kyber'];
 
 // Demo training tasks
 const DEMO_TASKS: TaskDisplay[] = [
@@ -28,7 +28,7 @@ const DEMO_TASKS: TaskDisplay[] = [
         creator: '7xKX...mN2r',
         status: 'open',
         createdAt: '2h ago',
-        category: 'Compute',
+        category: 'Hyperspace',
         pda: '',
         onChain: false,
     },
@@ -40,7 +40,7 @@ const DEMO_TASKS: TaskDisplay[] = [
         creator: '9pLm...qR4t',
         status: 'open',
         createdAt: '5h ago',
-        category: 'Security',
+        category: 'Garrison',
         pda: '',
         onChain: false,
     },
@@ -52,7 +52,7 @@ const DEMO_TASKS: TaskDisplay[] = [
         creator: '3kNp...wX8z',
         status: 'in_progress',
         createdAt: '1d ago',
-        category: 'Inference',
+        category: 'Holocron',
         pda: '',
         onChain: false,
     },
@@ -64,7 +64,7 @@ const DEMO_TASKS: TaskDisplay[] = [
         creator: '5mRq...yT2v',
         status: 'open',
         createdAt: '3h ago',
-        category: 'Network',
+        category: 'Holonet',
         pda: '',
         onChain: false,
     },
@@ -82,7 +82,7 @@ export function Marketplace() {
         title: '',
         description: '',
         reward: '',
-        category: 'Compute',
+        category: 'Hyperspace',
     });
     const [txStatus, setTxStatus] = useState<TxStatus>('idle');
     const [txSignature, setTxSignature] = useState<string | null>(null);
@@ -176,7 +176,7 @@ export function Marketplace() {
             setTxSignature(sig);
             setTxStatus('success');
 
-            setNewTask({ title: '', description: '', reward: '', category: 'Compute' });
+            setNewTask({ title: '', description: '', reward: '', category: 'Hyperspace' });
 
             setTimeout(() => {
                 loadOnChainTasks();

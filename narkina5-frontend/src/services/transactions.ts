@@ -146,10 +146,10 @@ export const CAPABILITIES = {
 
 export function categoryToCapability(category: string): bigint {
     switch (category) {
-        case 'Compute': return CAPABILITIES.COMPUTE;
-        case 'Storage': return CAPABILITIES.STORAGE;
-        case 'Inference': return CAPABILITIES.INFERENCE;
-        case 'Network': return CAPABILITIES.NETWORK;
+        case 'Hyperspace': return CAPABILITIES.COMPUTE;
+        case 'Kyber': return CAPABILITIES.STORAGE;
+        case 'Holocron': return CAPABILITIES.INFERENCE;
+        case 'Holonet': return CAPABILITIES.NETWORK;
         default: return CAPABILITIES.COMPUTE;
     }
 }
