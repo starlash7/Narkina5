@@ -46,10 +46,10 @@ export const TaskType = {
 
 // ── Capability Bitmasks ────────────────────────────────
 const CAPABILITY_LABELS: Record<number, string> = {
-    1: 'Compute',
-    2: 'Storage',
-    4: 'Inference',
-    8: 'Network',
+    1: 'Hyperspace',
+    2: 'Kyber',
+    4: 'Holocron',
+    8: 'Holonet',
     16: 'Coordinator',
 };
 
@@ -57,7 +57,7 @@ function primaryCapability(bitmask: bigint): string {
     for (const [bit, label] of Object.entries(CAPABILITY_LABELS)) {
         if (bitmask & BigInt(bit)) return label;
     }
-    return 'Compute';
+    return 'Hyperspace';
 }
 
 // ── Interfaces ─────────────────────────────────────────

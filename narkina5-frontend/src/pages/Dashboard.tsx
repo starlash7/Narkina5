@@ -57,10 +57,10 @@ const TRAINING_TASKS = [
     { title: 'Liquidity Assessment', desc: 'Analyze DEX pool depth and stability' },
 ];
 
-const SPECS = ['Compute', 'Inference', 'Security', 'Network', 'Storage'] as const;
+const SPECS = ['Hyperspace', 'Holocron', 'Garrison', 'Holonet', 'Kyber'] as const;
 const SPEC_COLORS: Record<string, string> = {
-    Compute: '#ff6b35', Inference: '#8b5cf6', Security: '#ef4444',
-    Network: '#3b82f6', Storage: '#22c55e',
+    Hyperspace: '#ff6b35', Holocron: '#8b5cf6', Garrison: '#ef4444',
+    Holonet: '#3b82f6', Kyber: '#22c55e',
 };
 
 const RANK_LABELS = ['', '1st', '2nd', '3rd', '4th', '5th', '6th'];
@@ -83,7 +83,7 @@ export function Dashboard() {
     const [newName, setNewName] = useState('');
     const [newSymbol, setNewSymbol] = useState('');
     const [newDesc, setNewDesc] = useState('');
-    const [newSpec, setNewSpec] = useState<string>('Compute');
+    const [newSpec, setNewSpec] = useState<string>('Hyperspace');
 
     // Graduation
     const [gradAgent, setGradAgent] = useState<CompetitorAgent | null>(null);

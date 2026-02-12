@@ -9,11 +9,11 @@
 // ---------------------------------------------------------------------------
 
 export type Specialization =
-  | 'Compute'
-  | 'Inference'
-  | 'Security'
-  | 'Network'
-  | 'Storage';
+  | 'Hyperspace'
+  | 'Holocron'
+  | 'Garrison'
+  | 'Holonet'
+  | 'Kyber';
 
 export interface CompetitionTask {
   id: string;
@@ -157,22 +157,22 @@ export const FLOOR_COLORS: Record<number, string> = {
 // ---------------------------------------------------------------------------
 
 const PREFIXES: string[] = [
-  'Cipher', 'Pulse', 'Nexus', 'Vault', 'Echo', 'Flux', 'Zero', 'Nova',
-  'Byte', 'Core', 'Grid', 'Ion', 'Quark', 'Shard', 'Titan', 'Wire',
-  'Blaze', 'Drift', 'Forge', 'Helix', 'Jade', 'Krypto', 'Lux', 'Matrix',
-  'Onyx', 'Prism', 'Rex', 'Storm', 'Torque', 'Ultra', 'Vex', 'Warp',
+  'Tarkin', 'Thrawn', 'Grievous', 'Dooku', 'Maul', 'Ventress', 'Boba', 'Bossk',
+  'Dengar', 'Cad', 'Hondo', 'Savage', 'Krennic', 'Moff', 'Pryce', 'Kallus',
+  'Hux', 'Phasma', 'Snoke', 'Djarin', 'Greef', 'Mayfeld', 'Migs', 'Saxon',
+  'Luthen', 'Dedra', 'Syril', 'Bix', 'Brasso', 'Nemik', 'Vel', 'Cinta',
 ];
 
 const SUFFIXES: string[] = [
-  'Bot', 'Node', 'AI', 'X', 'Prime', 'Core', 'Net', 'Sys',
+  'Droid', 'Unit', 'Cell', 'Ops', 'Prime', 'Forge', 'Net', 'Axis',
 ];
 
 const ALL_SPECIALIZATIONS: Specialization[] = [
-  'Compute',
-  'Inference',
-  'Security',
-  'Network',
-  'Storage',
+  'Hyperspace',
+  'Holocron',
+  'Garrison',
+  'Holonet',
+  'Kyber',
 ];
 
 // ---------------------------------------------------------------------------
@@ -185,21 +185,21 @@ const COMPETITION_TASKS: CompetitionTask[] = [
     id: 'task-01',
     title: 'Hash Rate Baseline',
     description: 'Compute SHA-256 hashes for a synthetic block header dataset and report throughput.',
-    category: 'Compute',
+    category: 'Hyperspace',
     difficulty: 1,
   },
   {
     id: 'task-02',
     title: 'Token Metadata Parser',
     description: 'Parse and validate on-chain token metadata from a raw transaction feed.',
-    category: 'Inference',
+    category: 'Holocron',
     difficulty: 1,
   },
   {
     id: 'task-03',
     title: 'Peer Discovery Ping',
     description: 'Enumerate reachable nodes in a simulated P2P gossip network within a time limit.',
-    category: 'Network',
+    category: 'Holonet',
     difficulty: 1,
   },
   // Difficulty 2
@@ -207,21 +207,21 @@ const COMPETITION_TASKS: CompetitionTask[] = [
     id: 'task-04',
     title: 'Signature Verification Audit',
     description: 'Detect invalid Ed25519 signatures across a batch of 10,000 mock transactions.',
-    category: 'Security',
+    category: 'Garrison',
     difficulty: 2,
   },
   {
     id: 'task-05',
     title: 'State Trie Compaction',
     description: 'Compact a Merkle-Patricia trie snapshot to minimize on-disk storage footprint.',
-    category: 'Storage',
+    category: 'Kyber',
     difficulty: 2,
   },
   {
     id: 'task-06',
     title: 'Gas Estimation Model',
     description: 'Build a predictive model that estimates gas costs for arbitrary smart-contract calls.',
-    category: 'Inference',
+    category: 'Holocron',
     difficulty: 2,
   },
   // Difficulty 3
@@ -229,21 +229,21 @@ const COMPETITION_TASKS: CompetitionTask[] = [
     id: 'task-07',
     title: 'MEV Opportunity Scanner',
     description: 'Identify profitable MEV bundles in a stream of simulated mempool transactions.',
-    category: 'Compute',
+    category: 'Hyperspace',
     difficulty: 3,
   },
   {
     id: 'task-08',
     title: 'Cross-Chain Bridge Monitor',
     description: 'Track asset flows across three simulated bridge contracts and flag discrepancies.',
-    category: 'Network',
+    category: 'Holonet',
     difficulty: 3,
   },
   {
     id: 'task-09',
     title: 'Rug-Pull Pattern Detector',
     description: 'Analyze liquidity pool histories and classify tokens as safe or probable rug-pulls.',
-    category: 'Security',
+    category: 'Garrison',
     difficulty: 3,
   },
   // Difficulty 4
@@ -251,21 +251,21 @@ const COMPETITION_TASKS: CompetitionTask[] = [
     id: 'task-10',
     title: 'ZK Proof Generation',
     description: 'Generate a zero-knowledge proof for a confidential token transfer circuit.',
-    category: 'Compute',
+    category: 'Hyperspace',
     difficulty: 4,
   },
   {
     id: 'task-11',
     title: 'Consensus Fork Resolution',
     description: 'Resolve a simulated chain fork by replaying conflicting block proposals under BFT rules.',
-    category: 'Network',
+    category: 'Holonet',
     difficulty: 4,
   },
   {
     id: 'task-12',
     title: 'Archival Node Reindex',
     description: 'Reindex 1M blocks of historical state data with full receipts and event logs.',
-    category: 'Storage',
+    category: 'Kyber',
     difficulty: 4,
   },
   // Difficulty 5
@@ -273,21 +273,21 @@ const COMPETITION_TASKS: CompetitionTask[] = [
     id: 'task-13',
     title: 'Flash Loan Exploit Synthesis',
     description: 'Craft a multi-step flash loan attack vector against a vulnerable DeFi protocol simulation.',
-    category: 'Security',
+    category: 'Garrison',
     difficulty: 5,
   },
   {
     id: 'task-14',
     title: 'On-Chain Governance Optimizer',
     description: 'Design an optimal voting strategy across a DAO with quadratic voting and delegation.',
-    category: 'Inference',
+    category: 'Holocron',
     difficulty: 5,
   },
   {
     id: 'task-15',
     title: 'Full-Chain State Proof',
     description: 'Produce a cryptographic proof of the entire chain state root against an independent validator set.',
-    category: 'Storage',
+    category: 'Kyber',
     difficulty: 5,
   },
 ];
