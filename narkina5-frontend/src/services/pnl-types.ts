@@ -125,12 +125,14 @@ export const PHASE_ORDER: TradingPhase[] = [
 
 export interface TradingDesk {
   id: string;
+  name: string;            // Star Wars cell name
   deskIndex: number;
   agents: string[];        // agent IDs
   portfolio: Portfolio;
-  status: 'pending' | 'trading' | 'complete';
+  status: 'pending' | 'trading' | 'complete' | 'eliminated';
   currentPhase: TradingPhase;
   roundPnL: number[];      // PnL per round
+  eliminatedRound?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,3 +225,27 @@ export const TOTAL_ROUNDS = 5;
 export const DESKS_COUNT = 8;
 export const AGENTS_PER_DESK = 8;
 export const SPOTLIGHT_DESKS = 3;              // top 3 use real AI
+
+// Cell names — Star Wars characters (no main protagonists)
+export const CELL_NAMES: string[] = [
+  'Thrawn',        // Grand Admiral — cold strategist
+  'Ventress',      // Asajj Ventress — dual-wielding assassin
+  'Maul',          // Darth Maul — savage survivor
+  'Krennic',       // Orson Krennic — ambitious architect
+  'Hondo',         // Hondo Ohnaka — pirate entrepreneur
+  'Grievous',      // General Grievous — relentless collector
+  'Boba',          // Boba Fett — legendary bounty hunter
+  'Luthen',        // Luthen Rael — rebel spymaster
+];
+
+// Elimination schedule: which round eliminates the bottom cell
+// Round 1: no elimination (warm-up)
+// Round 2: last place eliminated (8→7)
+// Round 3: last place eliminated (7→6)
+// Round 4: last 2 eliminated (6→4)
+// Round 5: final — top 1 wins
+export const ELIMINATION_SCHEDULE: Record<number, number> = {
+  2: 1,  // eliminate 1 cell
+  3: 1,  // eliminate 1 cell
+  4: 2,  // eliminate 2 cells
+};

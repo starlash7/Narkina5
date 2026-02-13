@@ -5,11 +5,12 @@ import { Connection } from '@solana/web3.js';
 import { useSolana } from '../contexts/SolanaContext';
 import {
     initializePnLCompetition,
-    generatePnLAgents,
     simulateDeskTrades,
     applyTrades,
     updatePortfolioPrices,
     rankDesks,
+    rankActiveDesks,
+    eliminateDesks,
     isSpotlightDesk,
     recordTokenSnapshot,
     logEntry,
@@ -20,6 +21,7 @@ import {
     ROLE_LABELS,
     TOTAL_ROUNDS,
     STARTING_CAPITAL,
+    ELIMINATION_SCHEDULE,
 } from '../services/pnl-types';
 import type {
     PnLCompetitionState,
@@ -147,11 +149,12 @@ export function PnLArena() {
         const priceMap: Record<string, number> = {};
         for (const t of state.availableTokens) priceMap[t.mint] = t.priceSOL;
 
-        // Rank desks for spotlight determination
-        const ranked = rankDesks(state.desks);
+        // Rank active desks for spotlight determination
+        const ranked = rankActiveDesks(state.desks);
 
         for (let i = 0; i < state.desks.length; i++) {
             const desk = state.desks[i];
+            if (desk.status === 'eliminated') continue;
             desk.status = 'trading';
 
             // Update existing positions with current prices
@@ -165,7 +168,7 @@ export function PnLArena() {
                 try {
                     decisions = await fetchAITrades(desk, state.agents, state.availableTokens, round);
                     state.apiCallsMade += 2; // researcher + trader calls
-                    state.log.push(logEntry(round, 'research', `${desk.id} AI analysis complete`, desk.id));
+                    state.log.push(logEntry(round, 'research', `${desk.name} AI analysis complete`, desk.id));
                 } catch {
                     decisions = simulateDeskTrades(desk, state.agents, state.availableTokens, round);
                 }
@@ -190,17 +193,23 @@ export function PnLArena() {
         }
 
         // PnL update log
-        const finalRanked = rankDesks(state.desks);
+        const finalRanked = rankActiveDesks(state.desks);
         const top = finalRanked[0];
         state.log.push(logEntry(round, 'pnl_update',
-            `Round ${round} leader: ${top.id} (PnL: ${top.portfolio.totalPnL >= 0 ? '+' : ''}${top.portfolio.totalPnL.toFixed(2)} SOL)`));
+            `Round ${round} leader: ${top.name} (PnL: ${top.portfolio.totalPnL >= 0 ? '+' : ''}${top.portfolio.totalPnL.toFixed(2)} SOL)`));
 
-        // Advance round
-        if (round >= TOTAL_ROUNDS) {
+        // Elimination
+        const elimLogs = eliminateDesks(state.desks, round);
+        state.log.push(...elimLogs);
+
+        // Advance round or complete
+        const remaining = state.desks.filter(d => d.status !== 'eliminated');
+        if (round >= TOTAL_ROUNDS || remaining.length <= 1) {
             state.status = 'complete';
-            state.winner = finalRanked[0].id;
+            const champion = rankActiveDesks(state.desks)[0];
+            state.winner = champion.id;
             state.log.push(logEntry(round, 'graduation',
-                `Competition complete! Winner: ${finalRanked[0].id} with ${finalRanked[0].portfolio.totalPnL >= 0 ? '+' : ''}${finalRanked[0].portfolio.totalPnL.toFixed(2)} SOL PnL`));
+                `Competition complete! Champion: ${champion.name} with ${champion.portfolio.totalPnL >= 0 ? '+' : ''}${champion.portfolio.totalPnL.toFixed(2)} SOL PnL`));
         } else {
             state.currentRound++;
         }
@@ -252,7 +261,7 @@ export function PnLArena() {
                     body: JSON.stringify({
                         role: 'Researcher',
                         agentName: researcher.name,
-                        deskId: desk.id,
+                        deskName: desk.name,
                         round,
                         tokens: tokenData,
                         portfolio: portfolioData,
@@ -275,7 +284,7 @@ export function PnLArena() {
                     body: JSON.stringify({
                         role: 'Trader',
                         agentName: trader.name,
-                        deskId: desk.id,
+                        deskName: desk.name,
                         round,
                         tokens: tokenData,
                         portfolio: portfolioData,
@@ -361,8 +370,8 @@ export function PnLArena() {
             <div style={{ maxWidth: 800, margin: '0 auto', padding: '3rem 1rem', textAlign: 'center' }}>
                 <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#ff6b35', marginBottom: '0.5rem' }}>PnL Arena</h1>
                 <p style={{ color: '#9ca3af', fontSize: '1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
-                    8 AI Trading Desks compete with 100 virtual SOL each.<br />
-                    Real pump.fun token prices. 5 rounds. Best PnL wins.
+                    8 Trading Cells — Thrawn, Ventress, Maul, Krennic, Hondo, Grievous, Boba, Luthen.<br />
+                    100 virtual SOL each. Real pump.fun prices. Losers get eliminated. Last cell standing wins.
                 </p>
                 <button onClick={handleInit} style={{
                     background: '#ff6b35', color: '#fff', border: 'none', borderRadius: 8,
@@ -374,7 +383,10 @@ export function PnLArena() {
         );
     }
 
-    const ranked = rankDesks(comp.desks);
+    // Active desks ranked by PnL, then eliminated desks at the end
+    const activeRanked = rankActiveDesks(comp.desks);
+    const eliminatedDesks = comp.desks.filter(d => d.status === 'eliminated').sort((a, b) => (b.eliminatedRound ?? 0) - (a.eliminatedRound ?? 0));
+    const ranked = [...activeRanked, ...eliminatedDesks];
     const winnerDesk = comp.winner ? comp.desks.find(d => d.id === comp.winner) : null;
 
     return (
@@ -383,9 +395,16 @@ export function PnLArena() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ff6b35', margin: 0 }}>PnL Arena</h1>
-                    <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
-                        Round {comp.currentRound}/{comp.totalRounds} | {comp.desks.length} desks | {comp.apiCallsMade} AI calls
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
+                            Round {comp.currentRound}/{comp.totalRounds} | {comp.desks.filter(d => d.status !== 'eliminated').length}/{comp.desks.length} desks alive | {comp.apiCallsMade} AI calls
+                        </span>
+                        {ELIMINATION_SCHEDULE[comp.currentRound] && comp.status !== 'complete' && (
+                            <span style={{ color: '#ef4444', fontSize: '0.7rem' }}>
+                                {ELIMINATION_SCHEDULE[comp.currentRound]} desk(s) will be eliminated after this round
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <label style={{ color: '#9ca3af', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
@@ -435,7 +454,7 @@ export function PnLArena() {
                     border: '1px solid #22c55e', background: 'rgba(34,197,94,0.05)',
                 }}>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#22c55e', marginBottom: '0.5rem' }}>
-                        Champion: {winnerDesk.id}
+                        Champion: {winnerDesk.name}
                     </div>
                     <div style={{ color: '#e5e5e5', marginBottom: '0.75rem' }}>
                         PnL: {winnerDesk.portfolio.totalPnL >= 0 ? '+' : ''}{winnerDesk.portfolio.totalPnL.toFixed(2)} SOL
@@ -514,36 +533,50 @@ export function PnLArena() {
                     {/* PnL Leaderboard */}
                     <div style={panelStyle}>
                         <div style={panelTitle}>PnL Leaderboard</div>
-                        {ranked.map((desk, i) => (
-                            <div key={desk.id} style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '0.35rem 0', borderBottom: i < ranked.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <span style={{
-                                        fontSize: '0.75rem', fontWeight: 700, width: 20, textAlign: 'center',
-                                        color: i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#666',
-                                    }}>
-                                        #{i + 1}
-                                    </span>
-                                    <span style={{ color: '#e5e5e5', fontSize: '0.8rem' }}>{desk.id}</span>
+                        {ranked.map((desk, i) => {
+                            const eliminated = desk.status === 'eliminated';
+                            return (
+                                <div key={desk.id} style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '0.35rem 0', borderBottom: i < ranked.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                                    opacity: eliminated ? 0.35 : 1,
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{
+                                            fontSize: '0.75rem', fontWeight: 700, width: 20, textAlign: 'center',
+                                            color: eliminated ? '#444' : i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#666',
+                                        }}>
+                                            {eliminated ? 'X' : `#${i + 1}`}
+                                        </span>
+                                        <span style={{
+                                            color: eliminated ? '#555' : '#e5e5e5', fontSize: '0.8rem',
+                                            textDecoration: eliminated ? 'line-through' : 'none',
+                                        }}>
+                                            {desk.name}
+                                        </span>
+                                        {eliminated && (
+                                            <span style={{ fontSize: '0.6rem', color: '#ef4444', fontWeight: 500 }}>
+                                                R{desk.eliminatedRound}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        {desk.portfolio.totalPnL >= 0
+                                            ? <TrendUpIcon size="0.75rem" />
+                                            : <TrendDownIcon size="0.75rem" />}
+                                        <span style={{
+                                            color: desk.portfolio.totalPnL >= 0 ? '#22c55e' : '#ef4444',
+                                            fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace',
+                                        }}>
+                                            {desk.portfolio.totalPnL >= 0 ? '+' : ''}{desk.portfolio.totalPnL.toFixed(2)} SOL
+                                        </span>
+                                        <span style={{ color: '#666', fontSize: '0.7rem' }}>
+                                            ({desk.portfolio.totalPnLPercent >= 0 ? '+' : ''}{desk.portfolio.totalPnLPercent.toFixed(1)}%)
+                                        </span>
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    {desk.portfolio.totalPnL >= 0
-                                        ? <TrendUpIcon size="0.75rem" />
-                                        : <TrendDownIcon size="0.75rem" />}
-                                    <span style={{
-                                        color: desk.portfolio.totalPnL >= 0 ? '#22c55e' : '#ef4444',
-                                        fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace',
-                                    }}>
-                                        {desk.portfolio.totalPnL >= 0 ? '+' : ''}{desk.portfolio.totalPnL.toFixed(2)} SOL
-                                    </span>
-                                    <span style={{ color: '#666', fontSize: '0.7rem' }}>
-                                        ({desk.portfolio.totalPnLPercent >= 0 ? '+' : ''}{desk.portfolio.totalPnLPercent.toFixed(1)}%)
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Spotlight Panel */}
@@ -575,11 +608,16 @@ export function PnLArena() {
                             flex: 1, overflow: 'auto', maxHeight: 300,
                             fontSize: '0.7rem', fontFamily: 'monospace', lineHeight: 1.5,
                         }}>
-                            {comp.log.map((entry, i) => (
-                                <div key={i} style={{ color: logColor(entry) }}>
-                                    {entry.deskId ? `[${entry.deskId}] ` : ''}{entry.message}
-                                </div>
-                            ))}
+                            {comp.log.map((entry, i) => {
+                                const deskName = entry.deskId
+                                    ? comp.desks.find(d => d.id === entry.deskId)?.name
+                                    : null;
+                                return (
+                                    <div key={i} style={{ color: logColor(entry) }}>
+                                        {deskName ? `[${deskName}] ` : ''}{entry.message}
+                                    </div>
+                                );
+                            })}
                             <span style={{ animation: 'blink 1s infinite', color: '#ff6b35' }}>_</span>
                         </div>
                     </div>
@@ -609,6 +647,7 @@ function DeskCard({
 }) {
     const pnl = desk.portfolio.totalPnL;
     const pnlPct = desk.portfolio.totalPnLPercent;
+    const eliminated = desk.status === 'eliminated';
     const deskAgents = desk.agents.map(id => agents[id]).filter(Boolean);
 
     // Group agents by role
@@ -622,21 +661,36 @@ function DeskCard({
         <div style={{
             ...panelStyle,
             cursor: 'pointer',
-            border: isSelected ? '1px solid #ff6b35' : '1px solid rgba(255,107,53,0.15)',
+            border: eliminated ? '1px solid rgba(239,68,68,0.3)' : isSelected ? '1px solid #ff6b35' : '1px solid rgba(255,107,53,0.15)',
             transition: 'border-color 0.2s',
+            opacity: eliminated ? 0.4 : 1,
+            position: 'relative' as const,
         }} onClick={onSelect}>
+            {eliminated && (
+                <div style={{
+                    position: 'absolute', top: 6, right: 8,
+                    fontSize: '0.6rem', fontWeight: 700, color: '#ef4444',
+                    background: 'rgba(239,68,68,0.15)', padding: '0.1rem 0.4rem', borderRadius: 4,
+                    textTransform: 'uppercase' as const, letterSpacing: '0.05em',
+                }}>
+                    Eliminated R{desk.eliminatedRound}
+                </div>
+            )}
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{
                         fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.35rem', borderRadius: 4,
-                        background: rank <= 3 ? 'rgba(255,107,53,0.2)' : 'rgba(255,255,255,0.05)',
-                        color: rank === 1 ? '#ffd700' : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : '#666',
+                        background: eliminated ? 'rgba(239,68,68,0.1)' : rank <= 3 ? 'rgba(255,107,53,0.2)' : 'rgba(255,255,255,0.05)',
+                        color: eliminated ? '#ef4444' : rank === 1 ? '#ffd700' : rank === 2 ? '#c0c0c0' : rank === 3 ? '#cd7f32' : '#666',
                     }}>
-                        #{rank}
+                        {eliminated ? 'X' : `#${rank}`}
                     </span>
-                    <span style={{ color: '#e5e5e5', fontSize: '0.85rem', fontWeight: 600 }}>
-                        {desk.id.replace('desk-', 'Desk ')}
+                    <span style={{
+                        color: eliminated ? '#555' : '#e5e5e5', fontSize: '0.85rem', fontWeight: 600,
+                        textDecoration: eliminated ? 'line-through' : 'none',
+                    }}>
+                        {desk.name}
                     </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

@@ -15,6 +15,8 @@ import {
     DESKS_COUNT,
     AGENTS_PER_DESK,
     SPOTLIGHT_DESKS,
+    CELL_NAMES,
+    ELIMINATION_SCHEDULE,
 } from './pnl-types';
 import type {
     PnLAgent,
@@ -259,6 +261,7 @@ export function generatePnLAgents(): { agents: Record<string, PnLAgent>; desks: 
 
         desks.push({
             id: deskId,
+            name: CELL_NAMES[deskIdx],
             deskIndex: deskIdx,
             agents: deskAgentIds,
             portfolio: emptyPortfolio(),
@@ -390,7 +393,7 @@ export function applyTrades(
                     round: 0,
                     deskId: desk.id,
                     type: 'trade',
-                    message: `${desk.id} BUY ${decision.amountSOL.toFixed(2)} SOL of $${decision.symbol}`,
+                    message: `${desk.name} BUY ${decision.amountSOL.toFixed(2)} SOL of $${decision.symbol}`,
                 });
             }
         } else {
@@ -403,7 +406,7 @@ export function applyTrades(
                     round: 0,
                     deskId: desk.id,
                     type: 'trade',
-                    message: `${desk.id} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL`,
+                    message: `${desk.name} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL`,
                 });
             }
         }
@@ -433,6 +436,46 @@ export function rankDesks(desks: TradingDesk[]): TradingDesk[] {
 export function isSpotlightDesk(desk: TradingDesk, rankedDesks: TradingDesk[]): boolean {
     const idx = rankedDesks.findIndex((d) => d.id === desk.id);
     return idx >= 0 && idx < SPOTLIGHT_DESKS;
+}
+
+/**
+ * Rank only active (non-eliminated) desks by total PnL.
+ */
+export function rankActiveDesks(desks: TradingDesk[]): TradingDesk[] {
+    return desks.filter(d => d.status !== 'eliminated')
+        .sort((a, b) => b.portfolio.totalPnL - a.portfolio.totalPnL);
+}
+
+/**
+ * Eliminate the bottom N desks for a given round per ELIMINATION_SCHEDULE.
+ * Returns log entries for each elimination.
+ */
+export function eliminateDesks(
+    desks: TradingDesk[],
+    round: number,
+): PnLLogEntry[] {
+    const eliminateCount = ELIMINATION_SCHEDULE[round] ?? 0;
+    if (eliminateCount === 0) return [];
+
+    const active = rankActiveDesks(desks);
+    const toEliminate = active.slice(-eliminateCount);
+    const logs: PnLLogEntry[] = [];
+
+    for (const desk of toEliminate) {
+        const realDesk = desks.find(d => d.id === desk.id);
+        if (realDesk) {
+            realDesk.status = 'eliminated';
+            realDesk.eliminatedRound = round;
+            logs.push(logEntry(round, 'round_end',
+                `${realDesk.name} ELIMINATED (PnL: ${realDesk.portfolio.totalPnL >= 0 ? '+' : ''}${realDesk.portfolio.totalPnL.toFixed(2)} SOL)`,
+                realDesk.id));
+        }
+    }
+
+    const remaining = desks.filter(d => d.status !== 'eliminated').length;
+    logs.push(logEntry(round, 'system', `${eliminateCount} desk(s) eliminated. ${remaining} remain.`));
+
+    return logs;
 }
 
 // ---------------------------------------------------------------------------
