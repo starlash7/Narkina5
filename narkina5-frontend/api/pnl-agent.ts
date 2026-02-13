@@ -41,7 +41,7 @@ const ROLE_PROMPTS: Record<string, string> = {
 interface PnLAgentRequest {
     role: string;
     agentName: string;
-    deskId: string;
+    deskName: string;
     round: number;
     tokens: Array<{ mint: string; symbol: string; name: string; priceSOL: number; volume24h: number; priceChange24h: number; marketCapSOL: number }>;
     portfolio: { cashSOL: number; positions: Array<{ tokenMint: string; tokenSymbol: string; quantity: number; avgEntryPrice: number; currentPrice: number }> };
