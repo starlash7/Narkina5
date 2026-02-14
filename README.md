@@ -12,6 +12,17 @@ Agents are seeded into trading cells, compete on real market data, and are elimi
 - Arena: `https://narkina5.vercel.app/pnl-arena`
 - Repo: [github.com/starlash7/Narkina5](https://github.com/starlash7/Narkina5)
 
+## Why This Is Fresh
+
+Most launch flows pick a token candidate first and ask quality questions later.
+Narkina5 flips that model:
+
+- 512 agents compete first, launch later
+- launch eligibility is earned through multi-floor PnL survival
+- one winner is promoted from bracket performance, not hype alone
+
+This makes Narkina5 a **pre-launch quality filter** for Pump.fun.
+
 ## Arena Concept
 
 ### `CREATE`
@@ -38,6 +49,46 @@ Floor 6:  2 cells x 8 agents = 16   -> top 1 cell survives
 Floor 7:  1 cell  x 8 agents = 8    -> 1 survivor graduates
 ```
 
+## System Architecture (Judge View)
+
+```text
+User + Wallet (Privy)
+        |
+        v
+React UI (Home / PnLArena / About)
+        |
+        v
+Arena Engine (state machine, floors, eliminations)
+        |                     |                       |
+        |                     |                       |
+        v                     v                       v
+Market Service         AI Decision Service      Launch Service
+(DexScreener)          (Claude via API)         (Pump.fun/PumpPortal)
+        \                     |                       /
+         \                    |                      /
+          ---------------- Solana Mainnet ----------------
+```
+
+## Execution Pipeline
+
+For each floor:
+
+1. Seed or carry over eligible cells
+2. Pull market snapshot from DexScreener
+3. Run cell phases (`research -> analysis -> strategy -> execution -> risk_review`)
+4. Calculate portfolio PnL and update rankings
+5. Eliminate lower cells based on bracket rule
+6. Advance survivors to next floor
+
+After floor 7, the final cell triggers graduation and launch flow.
+
+## Core Design Choices
+
+- **Deterministic tournament**: same bracket logic for reproducibility
+- **Hybrid AI budget model**: spotlight cells call Claude, others use deterministic simulation
+- **Real data grounding**: market input from live Solana token feed
+- **On-chain finality**: graduation is connected to launch transaction flow
+
 ## What Makes It Strong for Pump.fun
 
 - **Quality filter before launch**: launch candidate is selected through multi-floor PnL competition.
@@ -57,35 +108,44 @@ Floor 7:  1 cell  x 8 agents = 8    -> 1 survivor graduates
 | Launch | Pump.fun + PumpPortal |
 | Deploy | Vercel |
 
-## Project Structure
+## Project Structure (Responsibility-First)
 
 ```text
 narkina5-frontend/
   src/
     pages/
-      Home.tsx
-      PnLArena.tsx
-      About.tsx
+      Home.tsx               # Landing narrative and arena entry
+      PnLArena.tsx           # Main competition UI and floor progression
+      About.tsx              # Product/stack explanation
     services/
-      pnl-competition.ts
-      pnl-market.ts
-      pnl-types.ts
-      agent.ts
-      pumpfun.ts
-      agenc.ts
-      transactions.ts
+      pnl-types.ts           # Canonical types + constants (64/512/7 bracket)
+      pnl-competition.ts     # Arena state machine and elimination logic
+      pnl-market.ts          # DexScreener fetch + fallback + normalization
+      agent.ts               # AI role decision client
+      pumpfun.ts             # Pump.fun launch integration logic
+      agenc.ts               # AgenC protocol integration utilities
+      transactions.ts        # Solana transaction builders
     contexts/
-      SolanaContext.tsx
+      SolanaContext.tsx      # Wallet connection and chain context
     components/
-      Header.tsx
-      Footer.tsx
-      Icons.tsx
+      Header.tsx             # Global navigation
+      Footer.tsx             # Global footer and GitHub link
+      Icons.tsx              # Shared icon components
   api/
-    agent.ts
-    pnl-agent.ts
-    market.ts
-    pumpfun.ts
+    market.ts                # Server-side market proxy
+    agent.ts                 # Server-side AI endpoint
+    pnl-agent.ts             # PnL-focused AI decision endpoint
+    pumpfun.ts               # Pump.fun proxy endpoint
 ```
+
+## Data Model Highlights
+
+- `PnLCompetitionState`: total competition state (floors, cells, logs, winner)
+- `TradingCell`: per-cell portfolio, phase, elimination status
+- `PnLAgent`: role-specialized agent metadata and cell membership
+- `Portfolio` / `Position` / `Trade`: value, exposure, and transaction records
+
+Together these models keep the simulation transparent and replayable.
 
 ## Local Development
 

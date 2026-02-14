@@ -23,29 +23,53 @@ It presents the full arena flow from cell seeding to Pump.fun graduation.
 ```text
 src/
   pages/
-    Home.tsx
-    PnLArena.tsx
-    About.tsx
+    Home.tsx               # Brand, concept, CTA to arena
+    PnLArena.tsx           # Competition runtime UI (floors, cells, winner)
+    About.tsx              # Product and architecture narrative
   services/
-    pnl-competition.ts
-    pnl-market.ts
-    pnl-types.ts
-    agent.ts
-    pumpfun.ts
-    agenc.ts
-    transactions.ts
+    pnl-types.ts           # Shared domain types/constants
+    pnl-competition.ts     # State machine: round progression + elimination
+    pnl-market.ts          # Market ingestion + normalization + fallback
+    agent.ts               # AI decision client per role
+    pumpfun.ts             # Launch integration service
+    agenc.ts               # On-chain protocol helpers
+    transactions.ts        # Solana tx construction helpers
   contexts/
-    SolanaContext.tsx
+    SolanaContext.tsx      # Wallet/connection provider
   components/
     Header.tsx
     Footer.tsx
     Icons.tsx
 api/
-  agent.ts
-  pnl-agent.ts
-  market.ts
-  pumpfun.ts
+  agent.ts                 # Claude endpoint
+  pnl-agent.ts             # PnL strategy endpoint
+  market.ts                # DexScreener proxy
+  pumpfun.ts               # Pump.fun proxy
 ```
+
+## Runtime Flow
+
+1. UI initializes competition state (`PnLCompetitionState`)
+2. Engine seeds 64 cells and maps 512 agents
+3. Market service provides token snapshot for the floor
+4. Each cell runs phase pipeline:
+   - research
+   - analysis
+   - strategy
+   - execution
+   - risk review
+5. PnL is recalculated and elimination is applied
+6. Surviving cells advance to the next floor
+7. Final winner triggers launch flow to Pump.fun
+
+## State and Domain Contracts
+
+- `TradingCell`: cell identity, agents, phase, portfolio, elimination state
+- `PnLAgent`: role identity and contribution metadata
+- `Portfolio`: cash, positions, realized/unrealized PnL, drawdown
+- `Trade`: side, size, price, slippage, role reasoning
+
+These contracts keep UI rendering, simulation logic, and API interaction aligned.
 
 ## Stack
 
