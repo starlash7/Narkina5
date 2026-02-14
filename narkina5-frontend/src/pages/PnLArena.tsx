@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets, useSignTransaction } from '@privy-io/react-auth/solana';
 import { Connection } from '@solana/web3.js';
+import { useNavigate } from 'react-router-dom';
 import { useSolana } from '../contexts/SolanaContext';
 import {
     initializePnLCompetition,
@@ -48,6 +49,7 @@ import {
 import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } from '../components/Icons';
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
+type PnLArenaMode = 'overview' | 'live';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 const CELLS_PER_PAGE = 8;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -103,11 +105,14 @@ const panelTitle: React.CSSProperties = {
 
 // ── Component ───────────────────────────────────────────
 
-export function PnLArena() {
+export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     const { authenticated, login } = usePrivy();
     const { wallets } = useWallets();
     const { signTransaction } = useSignTransaction();
     const { publicKey } = useSolana();
+    const navigate = useNavigate();
+    const isOverviewRoute = mode === 'overview';
+    const isLiveRoute = mode === 'live';
 
     const [comp, setComp] = useState<PnLCompetitionState | null>(null);
     const [isRunning, setIsRunning] = useState(false);
@@ -162,6 +167,12 @@ export function PnLArena() {
             setComp(updated);
         }
     }, []);
+
+    useEffect(() => {
+        if (isLiveRoute && !comp && !isRunning) {
+            void handleInit();
+        }
+    }, [isLiveRoute, comp, isRunning, handleInit]);
 
     // ── Run a single trading round ──────────────────────
     const runRound = useCallback(async () => {
@@ -431,11 +442,12 @@ export function PnLArena() {
         setCellPage(1);
         setGradStatus('idle');
         setGradResult(null);
-    }, []);
+        navigate('/pnl-arena');
+    }, [navigate]);
 
     // ── Render ──────────────────────────────────────────
 
-    if (!comp) {
+    if (isOverviewRoute) {
         return (
             <div style={{
                 minHeight: '100vh',
@@ -644,7 +656,7 @@ export function PnLArena() {
                         ))}
                     </div>
 
-                    <button onClick={handleInit} style={{
+                    <button onClick={() => navigate('/pnl-arena/live')} style={{
                         fontFamily: 'inherit',
                         fontSize: '1rem',
                         fontWeight: 600,
@@ -657,7 +669,7 @@ export function PnLArena() {
                         boxShadow: '0 0 36px rgba(255, 107, 53, 0.32)',
                         letterSpacing: '0.08em',
                     }}>
-                        INITIALIZE 512-AGENT ARENA
+                        ENTER LIVE 512-AGENT ARENA
                     </button>
                     <p style={{ fontSize: '0.65rem', color: '#4b5563', marginTop: '0.7rem' }}>
                         No wallet required to watch. Connect wallet only to graduate the champion.
@@ -666,6 +678,35 @@ export function PnLArena() {
             </div>
         );
     }
+
+    if (!comp && isLiveRoute) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(180deg, #0a0a0a 0%, #111111 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem',
+            }}>
+                <div style={{
+                    ...panelStyle,
+                    textAlign: 'center',
+                    maxWidth: 520,
+                    width: '100%',
+                }}>
+                    <h2 style={{ margin: '0 0 0.6rem 0', color: '#ff6b35', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        Initializing Arena
+                    </h2>
+                    <p style={{ margin: 0, color: '#9ca3af', fontSize: '0.9rem' }}>
+                        Loading cells, agents, and live market data.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!comp) return null;
 
     // Active cells ranked by PnL, then eliminated cells at the end
     const activeRanked = rankActiveCells(comp.cells);

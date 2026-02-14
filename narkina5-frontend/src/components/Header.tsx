@@ -55,6 +55,7 @@ export function Header() {
     const navLinks = [
         { path: '/', label: 'Home' },
         { path: '/pnl-arena', label: 'PnL Arena' },
+        { path: '/pnl-arena/live', label: 'Arena Live' },
         { path: '/about', label: 'About' },
     ];
 

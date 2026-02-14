@@ -17,7 +17,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
-            <Route path="/pnl-arena" element={<PnLArena />} />
+            <Route path="/pnl-arena" element={<PnLArena mode="overview" />} />
+            <Route path="/pnl-arena/live" element={<PnLArena mode="live" />} />
           </Routes>
           <Footer />
         </div>
