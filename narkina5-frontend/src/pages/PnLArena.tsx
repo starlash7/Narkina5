@@ -47,7 +47,7 @@ import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } f
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
-const CELLS_PER_PAGE = 12;
+const CELLS_PER_PAGE = 8;
 
 function getFloorFromRound(round: number, complete: boolean): number {
     if (complete) return TOTAL_FLOORS;
@@ -57,21 +57,22 @@ function getFloorFromRound(round: number, complete: boolean): number {
 // ── Styles ──────────────────────────────────────────────
 
 const panelStyle: React.CSSProperties = {
-    background: '#1a1a1a',
+    background: 'rgba(26, 26, 26, 0.42)',
     border: '1px solid rgba(255,107,53,0.15)',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: '1rem',
+    backdropFilter: 'blur(10px)',
 };
 
 const panelTitle: React.CSSProperties = {
-    fontSize: '0.85rem',
-    fontWeight: 500,
+    fontSize: '0.74rem',
+    fontWeight: 600,
     color: '#e5e5e5',
     marginBottom: '0.75rem',
     paddingBottom: '0.5rem',
     borderBottom: '1px solid rgba(255,107,53,0.15)',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
+    letterSpacing: '0.16em',
 };
 
 // ── Component ───────────────────────────────────────────
@@ -625,11 +626,37 @@ export function PnLArena() {
     const leaderboardCells = ranked.slice(0, 20);
 
     return (
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '1rem' }}>
+        <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(180deg, #0a0a0a 0%, #111111 100%)',
+            position: 'relative',
+            overflow: 'hidden',
+        }}>
+            <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `
+                    linear-gradient(rgba(255, 107, 53, 0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 107, 53, 0.03) 1px, transparent 1px)
+                `,
+                backgroundSize: '50px 50px',
+                pointerEvents: 'none',
+            }} />
+            <div style={{
+                position: 'absolute',
+                top: '-20%',
+                right: '-10%',
+                width: '40rem',
+                height: '40rem',
+                background: 'radial-gradient(circle, rgba(255, 107, 53, 0.12) 0%, transparent 70%)',
+                pointerEvents: 'none',
+            }} />
+
+            <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '2.5rem 1.5rem', position: 'relative' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ff6b35', margin: 0 }}>PnL Arena</h1>
+                    <h1 style={{ fontSize: '1.85rem', fontWeight: 300, color: '#ff6b35', letterSpacing: '0.08em', margin: 0, textTransform: 'uppercase' }}>PnL Arena</h1>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
                             Floor {currentFloor}/{TOTAL_FLOORS} | {comp.cells.filter(d => d.status !== 'eliminated').length}/{CELLS_COUNT} cells alive | {comp.apiCallsMade} AI calls
@@ -670,6 +697,7 @@ export function PnLArena() {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
                 gap: '0.4rem',
+                overflowX: 'auto',
             }}>
                 {FLOOR_BRACKET.map((floor) => {
                     const isActive = floor.floor === currentFloor;
@@ -772,7 +800,7 @@ export function PnLArena() {
             )}
 
             {/* Main Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
                 {/* Left: Trading Cells */}
                 <div>
                     <div style={{
@@ -839,7 +867,7 @@ export function PnLArena() {
                 {/* Right: Leaderboard + Log */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {/* PnL Leaderboard */}
-                    <div style={panelStyle}>
+                    <div style={{ ...panelStyle, maxHeight: 460, overflowY: 'auto' }}>
                         <div style={panelTitle}>PnL Cell Leaderboard</div>
                         {leaderboardCells.map((cell, i) => {
                             const eliminated = cell.status === 'eliminated';
@@ -941,6 +969,7 @@ export function PnLArena() {
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
             `}</style>
+            </main>
         </div>
     );
 }

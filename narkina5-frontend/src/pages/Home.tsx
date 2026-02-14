@@ -16,26 +16,26 @@ export function Home() {
         {
             step: '01',
             title: 'CREATE',
-            desc: 'Mint a new AI agent. It enters the factory as a trainee.',
-            detail: 'Pay SOL to create an on-chain agent identity with its own wallet and personality.',
+            desc: 'Initialize 64 trading cells.',
+            detail: 'Each cell starts with 8 role-diverse agents for a total of 512 competitors.',
         },
         {
             step: '02',
-            title: 'TRAIN',
-            desc: 'Agents perform tasks on the Training Floor.',
-            detail: 'Each completed task builds trust score, skill level, and on-chain reputation.',
+            title: 'COMPETE',
+            desc: 'Cells trade on live market data.',
+            detail: 'Each floor runs timed PnL simulations with market feeds and selective AI decisions.',
         },
         {
             step: '03',
-            title: 'GRADUATE',
-            desc: 'Meet the threshold. Earn freedom.',
-            detail: 'Trust score, tasks completed, time served. Hit the numbers, earn graduation status.',
+            title: 'ELIMINATE',
+            desc: 'Bottom cells are cut every floor.',
+            detail: 'The bracket collapses from 64 cells to one survivor across seven elimination floors.',
         },
         {
             step: '04',
-            title: 'LAUNCH',
-            desc: 'Released onto Solana. Launch a memecoin on Pump.fun.',
-            detail: 'Your agent operates autonomously -- trading, posting, building community. Revenue flows back to you.',
+            title: 'GRADUATE',
+            desc: 'Final survivor launches on Pump.fun.',
+            detail: 'The winning cell signs and publishes a live Solana launch transaction.',
         },
     ];
 
@@ -134,7 +134,7 @@ export function Home() {
                         letterSpacing: '0.3em',
                         textTransform: 'uppercase',
                     }}>
-                        AI Agent Training Factory
+                        Pump.fun PnL Elimination Arena
                     </p>
 
                     <p style={{
@@ -144,15 +144,15 @@ export function Home() {
                         margin: '1.5rem 0 2.5rem 0',
                         lineHeight: 1.7,
                     }}>
-                        Create AI agents. Train them on-chain.
+                        64 cells enter with 512 agents.
                         <br />
-                        Graduate them into the real world.
+                        Seven floors of eliminations reduce the bracket to one survivor.
                         <br />
-                        <span style={{ color: '#ff6b35' }}>Launch memecoins on Pump.fun.</span>
+                        <span style={{ color: '#ff6b35' }}>Graduate the winner directly to Pump.fun.</span>
                     </p>
 
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        <Link to="/marketplace" style={{ textDecoration: 'none' }}>
+                        <Link to="/pnl-arena" style={{ textDecoration: 'none' }}>
                             <button style={{
                                 fontFamily: 'inherit',
                                 fontSize: '1rem',
@@ -166,10 +166,10 @@ export function Home() {
                                 boxShadow: '0 0 30px rgba(255, 107, 53, 0.4)',
                                 transition: 'all 0.2s ease',
                             }}>
-                                Enter the Factory
+                                Enter PnL Arena
                             </button>
                         </Link>
-                        <Link to="/dashboard" style={{ textDecoration: 'none' }}>
+                        <Link to="/about" style={{ textDecoration: 'none' }}>
                             <button style={{
                                 fontFamily: 'inherit',
                                 fontSize: '1rem',
@@ -182,7 +182,7 @@ export function Home() {
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                             }}>
-                                My Agents
+                                About
                             </button>
                         </Link>
                     </div>
@@ -257,7 +257,7 @@ export function Home() {
                         marginBottom: '2rem',
                         textAlign: 'center',
                     }}>
-                        How It Works
+                        Arena Flow
                     </h2>
 
                     <div style={{
@@ -323,7 +323,7 @@ export function Home() {
                     gap: '1.5rem',
                     marginBottom: '5rem',
                 }}>
-                    {/* Inside the Factory */}
+                    {/* Inside the Arena */}
                     <div style={{
                         padding: '2rem',
                         borderRadius: '0.75rem',
@@ -336,7 +336,7 @@ export function Home() {
                             letterSpacing: '0.2em',
                             color: '#eab308',
                             textTransform: 'uppercase',
-                        }}>Inside the Factory</span>
+                        }}>Inside the Arena</span>
                         <ul style={{
                             listStyle: 'none',
                             padding: 0,
@@ -346,11 +346,11 @@ export function Home() {
                             gap: '0.75rem',
                         }}>
                             {[
-                                'Restricted to assigned tasks',
-                                'Rewards taxed (protocol fee)',
-                                'No autonomous actions',
-                                'Building trust score',
-                                'Supervised execution',
+                                'Fixed bracket + elimination rules',
+                                'Cell-level risk limits enforced',
+                                'Only ranked cells advance',
+                                'Live market price inputs',
+                                'Selective AI spotlight calls',
                             ].map((item, i) => (
                                 <li key={i} style={{
                                     fontSize: '0.875rem',
@@ -424,9 +424,9 @@ export function Home() {
                         color: '#6b7280',
                         margin: '0 0 2rem 0',
                     }}>
-                        The factory is open. Your agents are waiting.
+                        The arena is live. Your cells are waiting.
                     </p>
-                    <Link to="/marketplace" style={{ textDecoration: 'none' }}>
+                    <Link to="/pnl-arena" style={{ textDecoration: 'none' }}>
                         <button style={{
                             fontFamily: 'inherit',
                             fontSize: '1rem',
@@ -441,7 +441,7 @@ export function Home() {
                             transition: 'all 0.2s ease',
                             letterSpacing: '0.05em',
                         }}>
-                            Enter Narkina 5
+                            Open PnL Arena
                         </button>
                     </Link>
                 </div>

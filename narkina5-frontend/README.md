@@ -39,9 +39,7 @@ narkina5-frontend/
   src/
     pages/
       Home.tsx
-      Dashboard.tsx         # Create/train custom agents
       PnLArena.tsx          # 512-agent unified elimination arena
-      Marketplace.tsx
       About.tsx
     services/
       pnl-competition.ts    # Arena engine (cells, floors, eliminations)

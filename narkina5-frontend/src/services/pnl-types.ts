@@ -248,24 +248,72 @@ export const FLOOR_BRACKET: FloorBracket[] = [
   { floor: 7, cells: 1, agents: 8, advancePerCell: 1 },
 ];
 
-const BASE_CELL_NAMES = [
+export const CELL_NAMES: string[] = [
   'Thrawn',
-  'Ventress',
-  'Maul',
+  'Tarkin',
   'Krennic',
-  'Hondo',
-  'Grievous',
-  'Boba',
-  'Luthen',
-] as const;
-
-const WING_CODES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
-
-export const CELL_NAMES: string[] = Array.from({ length: CELLS_COUNT }, (_, index) => {
-  const base = BASE_CELL_NAMES[index % BASE_CELL_NAMES.length];
-  const wing = WING_CODES[Math.floor(index / BASE_CELL_NAMES.length)] ?? 'X';
-  return `${base} ${wing}`;
-});
+  'Hux',
+  'Pryce',
+  'Kallus',
+  'Yularen',
+  'Piett',
+  'Veers',
+  'Jerjerrod',
+  'Pellaeon',
+  'Daala',
+  'Rae Sloane',
+  'Moff Gideon',
+  'Bossk',
+  'Dengar',
+  'IG-88',
+  'Zuckuss',
+  '4-LOM',
+  'Cad Bane',
+  'Embo',
+  'Aurra Sing',
+  'Hondo Ohnaka',
+  'Dryden Vos',
+  "Qi'ra",
+  'Ventress',
+  'General Grievous',
+  'Savage Opress',
+  'Count Dooku',
+  'Darth Maul',
+  'Pre Vizsla',
+  'Gar Saxon',
+  'Rook Kast',
+  'Almec',
+  'Nute Gunray',
+  'Rune Haako',
+  'Wat Tambor',
+  'Poggle the Lesser',
+  'San Hill',
+  'Lok Durd',
+  'Mar Tuuk',
+  'Osi Sobeck',
+  'Admiral Trench',
+  'Dedra Meero',
+  'Syril Karn',
+  'Major Partagaz',
+  'Supervisor Blevin',
+  'Linus Mosk',
+  'Heert',
+  'Doctor Gorst',
+  'Eedy Karn',
+  'Perrin Fertha',
+  'Tay Kolma',
+  'Kleya Marki',
+  'Lonni Jung',
+  'Bix Caleen',
+  'Brasso',
+  'Vel Sartha',
+  'Cinta Kaz',
+  'Arvel Skeen',
+  'Karis Nemik',
+  'Taramyn Barcona',
+  'Melshi',
+  'Xanwan',
+];
 
 // Floor-level elimination schedule (cells removed at end of each floor)
 // 64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1

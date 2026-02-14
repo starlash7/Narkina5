@@ -3,13 +3,13 @@ import { TwitterIcon, GithubIcon } from './Icons';
 
 export function Footer() {
     const currentYear = new Date().getFullYear();
+    const githubRepo = 'https://github.com/starlash7/Narkina5';
 
     const footerLinks = [
         {
             title: 'Product',
             links: [
-                { label: 'Training Floor', to: '/marketplace' },
-                { label: 'My Agents', to: '/dashboard' },
+                { label: 'PnL Arena', to: '/pnl-arena' },
                 { label: 'About', to: '/about' },
             ],
         },
@@ -17,7 +17,7 @@ export function Footer() {
 
     const socialLinks = [
         { icon: <TwitterIcon />, href: 'https://twitter.com', label: 'Twitter' },
-        { icon: <GithubIcon />, href: 'https://github.com/starlash7/Narkina5', label: 'GitHub' },
+        { icon: <GithubIcon />, href: githubRepo, label: 'GitHub' },
     ];
 
     return (
