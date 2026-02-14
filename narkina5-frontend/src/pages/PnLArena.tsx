@@ -24,6 +24,7 @@ import {
     CELLS_COUNT,
     FLOOR_BRACKET,
     ELIMINATION_SCHEDULE,
+    MAX_POSITION_PERCENT,
 } from '../services/pnl-types';
 import type {
     PnLCompetitionState,
@@ -42,12 +43,37 @@ import {
     generateTokenDescription,
     getPumpfunUrl,
     saveGraduatedAgent,
+    getGraduatedAgents,
 } from '../services/pumpfun';
 import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } from '../components/Icons';
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 const CELLS_PER_PAGE = 8;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const GRAD_MIN_PNL_SOL = 10;
+const GRAD_RELAXED_MIN_PNL_SOL = 8;
+const GRAD_MAX_DRAWDOWN_PERCENT = 20;
+const GRAD_MIN_CONSISTENCY_PERCENT = 60;
+const GRAD_MAX_WEEKLY = 1;
+const GRAD_RELAX_AFTER_WEEKS = 4;
+
+interface GraduationGateResult {
+    eligible: boolean;
+    minPnlRequired: number;
+    consistencyPercent: number;
+    riskViolations: number;
+    weeklyGraduations: number;
+    weeksSinceLastGraduation: number;
+    checks: {
+        pnl: boolean;
+        drawdown: boolean;
+        consistency: boolean;
+        risk: boolean;
+        weeklySlot: boolean;
+    };
+    reasons: string[];
+}
 
 function getFloorFromRound(round: number, complete: boolean): number {
     if (complete) return TOTAL_FLOORS;
@@ -318,6 +344,8 @@ export function PnLArena() {
 
     // ── Graduation ──────────────────────────────────────
     const handleGraduate = useCallback(async (cell: TradingCell) => {
+        if (!comp) return;
+
         if (!authenticated || !publicKey || !wallets[0]) {
             login();
             return;
@@ -329,21 +357,30 @@ export function PnLArena() {
             .sort((a, b) => (b.investmentRole === 'Strategist' ? 1 : 0) - (a.investmentRole === 'Strategist' ? 1 : 0))[0];
 
         if (!bestAgent) return;
+        const gate = evaluateGraduationGate(cell);
+        if (!gate.eligible) {
+            setGradStatus('error');
+            setGradError(`Graduation gate not met: ${gate.reasons.join(' | ')}`);
+            return;
+        }
 
         setGradStatus('uploading');
         setGradError(null);
 
         try {
+            const tokenName = `${cell.name} Cell`;
+            const tokenSymbol = toCellSymbol(cell.name);
+            const composition = buildCellComposition(cell, comp.agents);
             const description = generateTokenDescription({
-                name: bestAgent.name,
-                symbol: bestAgent.symbol,
-                description: `PnL Arena Champion | ${cell.portfolio.totalPnL >= 0 ? '+' : ''}${cell.portfolio.totalPnL.toFixed(2)} SOL PnL`,
+                name: tokenName,
+                symbol: tokenSymbol,
+                description: `PnL Arena Champion Cell | ${cell.portfolio.totalPnL >= 0 ? '+' : ''}${cell.portfolio.totalPnL.toFixed(2)} SOL PnL\n\n${composition}`,
                 specialization: bestAgent.specialization,
                 trustScore: 100,
             });
             const metadataUri = await uploadMetadata(
-                bestAgent.name,
-                bestAgent.symbol,
+                tokenName,
+                tokenSymbol,
                 description,
                 bestAgent.specialization,
             );
@@ -355,8 +392,8 @@ export function PnLArena() {
                 publicKey.toBase58(),
                 mintPub,
                 metadataUri,
-                bestAgent.name,
-                bestAgent.symbol,
+                tokenName,
+                tokenSymbol,
             );
 
             setGradStatus('signing');
@@ -375,7 +412,7 @@ export function PnLArena() {
             await connection.confirmTransaction(sig, 'confirmed');
 
             const pumpfunUrl = getPumpfunUrl(mintPub);
-            saveGraduatedAgent({ name: bestAgent.name, symbol: bestAgent.symbol, specialization: bestAgent.specialization, mintAddress: mintPub, pumpfunUrl, graduatedAt: Date.now(), trustScore: 100 });
+            saveGraduatedAgent({ name: tokenName, symbol: tokenSymbol, specialization: bestAgent.specialization, mintAddress: mintPub, pumpfunUrl, graduatedAt: Date.now(), trustScore: 100 });
 
             setGradStatus('success');
             setGradResult({ mintAddress: mintPub, pumpfunUrl });
@@ -635,6 +672,7 @@ export function PnLArena() {
     const eliminatedCells = comp.cells.filter(d => d.status === 'eliminated').sort((a, b) => (b.eliminatedRound ?? 0) - (a.eliminatedRound ?? 0));
     const ranked = [...activeRanked, ...eliminatedCells];
     const winnerCell = comp.winner ? comp.cells.find(d => d.id === comp.winner) : null;
+    const winnerGate = winnerCell ? evaluateGraduationGate(winnerCell) : null;
     const currentFloor = getFloorFromRound(comp.currentRound, comp.status === 'complete');
     const eliminationCount = ELIMINATION_SCHEDULE[comp.currentRound] ?? 0;
     const totalCellPages = Math.max(1, Math.ceil(ranked.length / CELLS_PER_PAGE));
@@ -770,7 +808,40 @@ export function PnLArena() {
                         PnL: {winnerCell.portfolio.totalPnL >= 0 ? '+' : ''}{winnerCell.portfolio.totalPnL.toFixed(2)} SOL
                         ({winnerCell.portfolio.totalPnLPercent >= 0 ? '+' : ''}{winnerCell.portfolio.totalPnLPercent.toFixed(1)}%)
                     </div>
-                    {gradStatus === 'idle' && authenticated && (
+                    {winnerGate && (
+                        <div style={{
+                            margin: '0 auto 0.8rem auto',
+                            maxWidth: 640,
+                            textAlign: 'left',
+                            background: 'rgba(0,0,0,0.2)',
+                            border: `1px solid ${winnerGate.eligible ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+                            borderRadius: 8,
+                            padding: '0.6rem 0.75rem',
+                            color: '#9ca3af',
+                            fontSize: '0.74rem',
+                            lineHeight: 1.5,
+                        }}>
+                            <div style={{ color: winnerGate.eligible ? '#22c55e' : '#ef4444', fontWeight: 700, marginBottom: '0.3rem' }}>
+                                Graduation Gate: {winnerGate.eligible ? 'PASS' : 'BLOCKED'}
+                            </div>
+                            <div>PnL {winnerCell.portfolio.totalPnL.toFixed(2)} / Required {winnerGate.minPnlRequired.toFixed(2)} SOL</div>
+                            <div>Drawdown {winnerCell.portfolio.maxDrawdown.toFixed(1)}% / Max {GRAD_MAX_DRAWDOWN_PERCENT}%</div>
+                            <div>Consistency {winnerGate.consistencyPercent.toFixed(1)}% / Min {GRAD_MIN_CONSISTENCY_PERCENT}%</div>
+                            <div>Risk Violations {winnerGate.riskViolations} / Required 0</div>
+                            <div>Weekly Graduations {winnerGate.weeklyGraduations} / Max {GRAD_MAX_WEEKLY}</div>
+                            {!winnerGate.eligible && (
+                                <div style={{ marginTop: '0.3rem', color: '#ef4444' }}>
+                                    {winnerGate.reasons.join(' | ')}
+                                </div>
+                            )}
+                            {winnerGate.weeksSinceLastGraduation >= GRAD_RELAX_AFTER_WEEKS && (
+                                <div style={{ marginTop: '0.3rem', color: '#f59e0b' }}>
+                                    Soft guardrail active: min PnL relaxed to {winnerGate.minPnlRequired.toFixed(0)} SOL after {winnerGate.weeksSinceLastGraduation} weeks without graduation.
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {gradStatus === 'idle' && authenticated && winnerGate?.eligible && (
                         <button onClick={() => handleGraduate(winnerCell)} style={{
                             background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
@@ -778,13 +849,26 @@ export function PnLArena() {
                             Graduate to Pump.fun
                         </button>
                     )}
-                    {gradStatus === 'idle' && !authenticated && (
+                    {gradStatus === 'idle' && authenticated && winnerGate && !winnerGate.eligible && (
+                        <button disabled style={{
+                            background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 6,
+                            padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'not-allowed',
+                        }}>
+                            Graduation Blocked
+                        </button>
+                    )}
+                    {gradStatus === 'idle' && !authenticated && winnerGate?.eligible && (
                         <button onClick={login} style={{
                             background: '#ff6b35', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', cursor: 'pointer',
                         }}>
                             Connect Wallet to Graduate
                         </button>
+                    )}
+                    {gradStatus === 'idle' && !authenticated && winnerGate && !winnerGate.eligible && (
+                        <div style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
+                            Gate conditions are not met this season.
+                        </div>
                     )}
                     {gradStatus !== 'idle' && gradStatus !== 'success' && gradStatus !== 'error' && (
                         <div style={{ color: '#ff6b35', fontSize: '0.85rem' }}>
@@ -1157,4 +1241,89 @@ function generateMockTokens(): PumpToken[] {
         createdAt: Date.now() - Math.random() * 86400000 * 30,
         bondingCurveProgress: Math.random() * 100,
     }));
+}
+
+function toCellSymbol(cellName: string): string {
+    const symbol = cellName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return symbol.slice(0, 10) || 'N5CELL';
+}
+
+function getWeekKey(timestamp: number): string {
+    const date = new Date(timestamp);
+    const day = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function buildCellComposition(cell: TradingCell, agents: Record<string, PnLAgent>): string {
+    const roster = cell.agents
+        .map((id, idx) => {
+            const agent = agents[id];
+            if (!agent) return `${idx + 1}. Unknown`;
+            return `${idx + 1}. ${agent.name} [${agent.investmentRole}]`;
+        })
+        .join('\n');
+
+    const roleCounts: Record<string, number> = {};
+    for (const id of cell.agents) {
+        const role = agents[id]?.investmentRole ?? 'Unknown';
+        roleCounts[role] = (roleCounts[role] ?? 0) + 1;
+    }
+    const roleSummary = Object.entries(roleCounts)
+        .map(([role, count]) => `${role} x${count}`)
+        .join(', ');
+
+    return `Cell identity: ${cell.name}\nRole composition: ${roleSummary}\nAgent roster:\n${roster}`;
+}
+
+function evaluateGraduationGate(cell: TradingCell): GraduationGateResult {
+    const graduated = [...getGraduatedAgents()].sort((a, b) => b.graduatedAt - a.graduatedAt);
+    const now = Date.now();
+    const thisWeek = getWeekKey(now);
+    const weeklyGraduations = graduated.filter((g) => getWeekKey(g.graduatedAt) === thisWeek).length;
+    const lastGraduationAt = graduated[0]?.graduatedAt;
+    const weeksSinceLastGraduation = lastGraduationAt ? Math.floor((now - lastGraduationAt) / WEEK_MS) : 0;
+    const minPnlRequired = weeksSinceLastGraduation >= GRAD_RELAX_AFTER_WEEKS
+        ? GRAD_RELAXED_MIN_PNL_SOL
+        : GRAD_MIN_PNL_SOL;
+
+    const pnlCheck = cell.portfolio.totalPnL >= minPnlRequired;
+    const drawdownCheck = cell.portfolio.maxDrawdown <= GRAD_MAX_DRAWDOWN_PERCENT;
+    const totalRounds = Math.max(1, cell.roundPnL.length);
+    const positiveRounds = cell.roundPnL.filter((v) => v > 0).length;
+    const consistencyPercent = (positiveRounds / totalRounds) * 100;
+    const consistencyCheck = consistencyPercent >= GRAD_MIN_CONSISTENCY_PERCENT;
+    const totalValue = Math.max(cell.portfolio.totalValue, 0.000001);
+    const riskViolations = cell.portfolio.positions.reduce((count, pos) => {
+        const weight = (pos.currentPrice * pos.quantity) / totalValue;
+        return count + (weight > MAX_POSITION_PERCENT + 0.0001 ? 1 : 0);
+    }, 0);
+    const riskCheck = riskViolations === 0;
+    const weeklySlotCheck = weeklyGraduations < GRAD_MAX_WEEKLY;
+
+    const reasons: string[] = [];
+    if (!pnlCheck) reasons.push(`PnL < +${minPnlRequired.toFixed(0)} SOL`);
+    if (!drawdownCheck) reasons.push(`drawdown > ${GRAD_MAX_DRAWDOWN_PERCENT}%`);
+    if (!consistencyCheck) reasons.push(`consistency < ${GRAD_MIN_CONSISTENCY_PERCENT}%`);
+    if (!riskCheck) reasons.push('risk violations > 0');
+    if (!weeklySlotCheck) reasons.push('weekly graduation slot exhausted');
+
+    return {
+        eligible: pnlCheck && drawdownCheck && consistencyCheck && riskCheck && weeklySlotCheck,
+        minPnlRequired,
+        consistencyPercent,
+        riskViolations,
+        weeklyGraduations,
+        weeksSinceLastGraduation,
+        checks: {
+            pnl: pnlCheck,
+            drawdown: drawdownCheck,
+            consistency: consistencyCheck,
+            risk: riskCheck,
+            weeklySlot: weeklySlotCheck,
+        },
+        reasons,
+    };
 }
