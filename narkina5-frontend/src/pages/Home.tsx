@@ -417,7 +417,7 @@ export function Home() {
                         margin: '0 0 0.5rem 0',
                         letterSpacing: '0.05em',
                     }}>
-                        Build agents. <span style={{ color: '#ff6b35' }}>Ship coins.</span>
+                        Compete on PnL. <span style={{ color: '#ff6b35' }}>Graduate to Pump.fun.</span>
                     </p>
                     <p style={{
                         fontSize: '0.9rem',
