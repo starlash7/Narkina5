@@ -56,7 +56,6 @@ export function Header() {
         { path: '/', label: 'Home' },
         { path: '/marketplace', label: 'Training Floor' },
         { path: '/dashboard', label: 'My Agents' },
-        { path: '/competition', label: 'Prison Arena' },
         { path: '/pnl-arena', label: 'PnL Arena' },
         { path: '/about', label: 'About' },
     ];

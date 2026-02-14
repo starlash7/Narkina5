@@ -1,20 +1,18 @@
 // ============================================================================
 // Narkina5 PnL Arena — Competition Engine
-// 8 Trading Desks. 64 Agents. Virtual portfolios. Real token prices.
+// 64 Trading Cells. 512 Agents. 7 Floors. Virtual portfolios. Real token prices.
 // Pure business logic / data layer. No React.
 // ============================================================================
 
 import { generateAgent, seededRandom } from './competition';
-import type { Specialization } from './competition';
 import {
-    ROLE_FROM_SPEC,
     STARTING_CAPITAL,
     MAX_POSITION_PERCENT,
     SLIPPAGE_PERCENT,
     TOTAL_ROUNDS,
-    DESKS_COUNT,
-    AGENTS_PER_DESK,
-    SPOTLIGHT_DESKS,
+    CELLS_COUNT,
+    AGENTS_PER_CELL,
+    SPOTLIGHT_CELLS,
     CELL_NAMES,
     ELIMINATION_SCHEDULE,
 } from './pnl-types';
@@ -22,9 +20,8 @@ import type {
     PnLAgent,
     PnLCompetitionState,
     PnLLogEntry,
-    TradingDesk,
+    TradingCell,
     Portfolio,
-    Position,
     Trade,
     PumpToken,
     TokenSnapshot,
@@ -33,10 +30,10 @@ import type {
 } from './pnl-types';
 
 // ---------------------------------------------------------------------------
-// Role assignment pattern per desk (8 agents = 5 roles, some doubled)
+// Role assignment pattern per cell (8 agents = 5 roles, some doubled)
 // ---------------------------------------------------------------------------
 
-const DESK_ROLE_PATTERN: InvestmentRole[] = [
+const CELL_ROLE_PATTERN: InvestmentRole[] = [
     'Researcher', 'Researcher',
     'Analyst',
     'Strategist',
@@ -101,7 +98,7 @@ export function updatePortfolioPrices(
 let tradeCounter = 0;
 
 /**
- * Execute a virtual buy on a desk portfolio.
+ * Execute a virtual buy on a cell portfolio.
  */
 export function executeBuy(
     portfolio: Portfolio,
@@ -152,7 +149,7 @@ export function executeBuy(
 }
 
 /**
- * Execute a virtual sell on a desk portfolio.
+ * Execute a virtual sell on a cell portfolio.
  */
 export function executeSell(
     portfolio: Portfolio,
@@ -229,41 +226,41 @@ function recalcPortfolio(p: Portfolio): Portfolio {
 }
 
 // ---------------------------------------------------------------------------
-// Agent & desk generation
+// Agent & cell generation
 // ---------------------------------------------------------------------------
 
 /**
- * Generate 64 PnL agents organized into 8 desks.
+ * Generate 512 PnL agents organized into 64 cells.
  */
-export function generatePnLAgents(): { agents: Record<string, PnLAgent>; desks: TradingDesk[] } {
+export function generatePnLAgents(): { agents: Record<string, PnLAgent>; cells: TradingCell[] } {
     const agents: Record<string, PnLAgent> = {};
-    const desks: TradingDesk[] = [];
+    const cells: TradingCell[] = [];
 
-    for (let deskIdx = 0; deskIdx < DESKS_COUNT; deskIdx++) {
-        const deskId = `desk-${deskIdx}`;
-        const deskAgentIds: string[] = [];
+    for (let cellIdx = 0; cellIdx < CELLS_COUNT; cellIdx++) {
+        const cellId = `cell-${cellIdx}`;
+        const cellAgentIds: string[] = [];
 
-        for (let slot = 0; slot < AGENTS_PER_DESK; slot++) {
-            const globalIndex = deskIdx * AGENTS_PER_DESK + slot;
+        for (let slot = 0; slot < AGENTS_PER_CELL; slot++) {
+            const globalIndex = cellIdx * AGENTS_PER_CELL + slot;
             const base = generateAgent(globalIndex);
-            const role = DESK_ROLE_PATTERN[slot];
+            const role = CELL_ROLE_PATTERN[slot];
 
             const pnlAgent: PnLAgent = {
                 ...base,
                 investmentRole: role,
-                deskId,
+                cellId,
                 contribution: '',
             };
 
             agents[pnlAgent.id] = pnlAgent;
-            deskAgentIds.push(pnlAgent.id);
+            cellAgentIds.push(pnlAgent.id);
         }
 
-        desks.push({
-            id: deskId,
-            name: CELL_NAMES[deskIdx],
-            deskIndex: deskIdx,
-            agents: deskAgentIds,
+        cells.push({
+            id: cellId,
+            name: CELL_NAMES[cellIdx],
+            cellIndex: cellIdx,
+            agents: cellAgentIds,
             portfolio: emptyPortfolio(),
             status: 'pending',
             currentPhase: 'research',
@@ -271,7 +268,7 @@ export function generatePnLAgents(): { agents: Record<string, PnLAgent>; desks: 
         });
     }
 
-    return { agents, desks };
+    return { agents, cells };
 }
 
 // ---------------------------------------------------------------------------
@@ -279,13 +276,13 @@ export function generatePnLAgents(): { agents: Record<string, PnLAgent>; desks: 
 // ---------------------------------------------------------------------------
 
 export function initializePnLCompetition(): PnLCompetitionState {
-    const { agents, desks } = generatePnLAgents();
+    const { agents, cells } = generatePnLAgents();
 
     return {
         status: 'idle',
         currentRound: 1,
         totalRounds: TOTAL_ROUNDS,
-        desks,
+        cells,
         agents,
         availableTokens: [],
         tokenHistory: {},
@@ -295,7 +292,7 @@ export function initializePnLCompetition(): PnLCompetitionState {
                 timestamp: Date.now(),
                 round: 0,
                 type: 'system',
-                message: `PnL Arena initialized. ${DESKS_COUNT} trading desks, ${Object.keys(agents).length} agents. Awaiting market data...`,
+                message: `PnL Arena initialized. ${CELLS_COUNT} trading cells, ${Object.keys(agents).length} agents. Awaiting market data...`,
             },
         ],
         apiCallsMade: 0,
@@ -303,15 +300,15 @@ export function initializePnLCompetition(): PnLCompetitionState {
 }
 
 // ---------------------------------------------------------------------------
-// Simulation scoring (for non-spotlight desks)
+// Simulation scoring (for non-spotlight cells)
 // ---------------------------------------------------------------------------
 
 /**
- * Simulate a trading round for a desk (no AI, deterministic).
+ * Simulate a trading round for a cell (no AI, deterministic).
  * Returns trade decisions based on seeded random.
  */
-export function simulateDeskTrades(
-    desk: TradingDesk,
+export function simulateCellTrades(
+    cell: TradingCell,
     agents: Record<string, PnLAgent>,
     tokens: PumpToken[],
     round: number,
@@ -319,7 +316,7 @@ export function simulateDeskTrades(
     if (tokens.length === 0) return [];
 
     const decisions: TradeDecision[] = [];
-    const seed = desk.deskIndex * 997 + round * 31;
+    const seed = cell.cellIndex * 997 + round * 31;
 
     // Simulate: buy 2-3 tokens, maybe sell 1 position
     const buyCount = 2 + Math.floor(seededRandom(seed) * 2); // 2-3 buys
@@ -328,7 +325,7 @@ export function simulateDeskTrades(
         const tokenIdx = Math.floor(seededRandom(seed + i * 13 + 7) * tokens.length);
         const token = tokens[tokenIdx];
         const spendPercent = 0.05 + seededRandom(seed + i * 17 + 3) * 0.15; // 5-20%
-        const spendSOL = desk.portfolio.cashSOL * spendPercent;
+        const spendSOL = cell.portfolio.cashSOL * spendPercent;
 
         if (spendSOL > 0.1) {
             decisions.push({
@@ -342,9 +339,9 @@ export function simulateDeskTrades(
     }
 
     // Maybe sell a position
-    if (desk.portfolio.positions.length > 0 && seededRandom(seed + 99) > 0.5) {
-        const posIdx = Math.floor(seededRandom(seed + 101) * desk.portfolio.positions.length);
-        const pos = desk.portfolio.positions[posIdx];
+    if (cell.portfolio.positions.length > 0 && seededRandom(seed + 99) > 0.5) {
+        const posIdx = Math.floor(seededRandom(seed + 101) * cell.portfolio.positions.length);
+        const pos = cell.portfolio.positions[posIdx];
         const sellPercent = 0.3 + seededRandom(seed + 103) * 0.7; // 30-100%
         decisions.push({
             side: 'sell',
@@ -359,24 +356,24 @@ export function simulateDeskTrades(
 }
 
 /**
- * Apply trade decisions to a desk portfolio.
+ * Apply trade decisions to a cell portfolio.
  */
 export function applyTrades(
-    desk: TradingDesk,
+    cell: TradingCell,
     decisions: TradeDecision[],
     tokens: PumpToken[],
     agents: Record<string, PnLAgent>,
-): { desk: TradingDesk; trades: Trade[]; logs: PnLLogEntry[] } {
+): { cell: TradingCell; trades: Trade[]; logs: PnLLogEntry[] } {
     const tokenMap = new Map(tokens.map((t) => [t.mint, t]));
-    let portfolio = { ...desk.portfolio };
+    let portfolio = { ...cell.portfolio };
     const allTrades: Trade[] = [];
     const logs: PnLLogEntry[] = [];
 
-    // Pick a trader agent from the desk for attribution
-    const traderAgent = desk.agents
+    // Pick a trader agent from the cell for attribution
+    const traderAgent = cell.agents
         .map((id) => agents[id])
         .find((a) => a.investmentRole === 'Trader');
-    const agentId = traderAgent?.id || desk.agents[0];
+    const agentId = traderAgent?.id || cell.agents[0];
     const agentRole: InvestmentRole = traderAgent?.investmentRole || 'Trader';
 
     for (const decision of decisions) {
@@ -391,9 +388,9 @@ export function applyTrades(
                 logs.push({
                     timestamp: Date.now(),
                     round: 0,
-                    deskId: desk.id,
+                    cellId: cell.id,
                     type: 'trade',
-                    message: `${desk.name} BUY ${decision.amountSOL.toFixed(2)} SOL of $${decision.symbol}`,
+                    message: `${cell.name} BUY ${decision.amountSOL.toFixed(2)} SOL of $${decision.symbol}`,
                 });
             }
         } else {
@@ -404,76 +401,76 @@ export function applyTrades(
                 logs.push({
                     timestamp: Date.now(),
                     round: 0,
-                    deskId: desk.id,
+                    cellId: cell.id,
                     type: 'trade',
-                    message: `${desk.name} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL`,
+                    message: `${cell.name} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL`,
                 });
             }
         }
     }
 
     return {
-        desk: { ...desk, portfolio },
+        cell: { ...cell, portfolio },
         trades: allTrades,
         logs,
     };
 }
 
 // ---------------------------------------------------------------------------
-// Desk ranking
+// Cell ranking
 // ---------------------------------------------------------------------------
 
 /**
- * Rank desks by total PnL (descending).
+ * Rank cells by total PnL (descending).
  */
-export function rankDesks(desks: TradingDesk[]): TradingDesk[] {
-    return [...desks].sort((a, b) => b.portfolio.totalPnL - a.portfolio.totalPnL);
+export function rankCells(cells: TradingCell[]): TradingCell[] {
+    return [...cells].sort((a, b) => b.portfolio.totalPnL - a.portfolio.totalPnL);
 }
 
 /**
- * Check if a desk is in the spotlight (top N by PnL).
+ * Check if a cell is in the spotlight (top N by PnL).
  */
-export function isSpotlightDesk(desk: TradingDesk, rankedDesks: TradingDesk[]): boolean {
-    const idx = rankedDesks.findIndex((d) => d.id === desk.id);
-    return idx >= 0 && idx < SPOTLIGHT_DESKS;
+export function isSpotlightCell(cell: TradingCell, rankedCells: TradingCell[]): boolean {
+    const idx = rankedCells.findIndex((d) => d.id === cell.id);
+    return idx >= 0 && idx < SPOTLIGHT_CELLS;
 }
 
 /**
- * Rank only active (non-eliminated) desks by total PnL.
+ * Rank only active (non-eliminated) cells by total PnL.
  */
-export function rankActiveDesks(desks: TradingDesk[]): TradingDesk[] {
-    return desks.filter(d => d.status !== 'eliminated')
+export function rankActiveCells(cells: TradingCell[]): TradingCell[] {
+    return cells.filter(d => d.status !== 'eliminated')
         .sort((a, b) => b.portfolio.totalPnL - a.portfolio.totalPnL);
 }
 
 /**
- * Eliminate the bottom N desks for a given round per ELIMINATION_SCHEDULE.
+ * Eliminate the bottom N cells for a given round per ELIMINATION_SCHEDULE.
  * Returns log entries for each elimination.
  */
-export function eliminateDesks(
-    desks: TradingDesk[],
+export function eliminateCells(
+    cells: TradingCell[],
     round: number,
 ): PnLLogEntry[] {
     const eliminateCount = ELIMINATION_SCHEDULE[round] ?? 0;
     if (eliminateCount === 0) return [];
 
-    const active = rankActiveDesks(desks);
+    const active = rankActiveCells(cells);
     const toEliminate = active.slice(-eliminateCount);
     const logs: PnLLogEntry[] = [];
 
-    for (const desk of toEliminate) {
-        const realDesk = desks.find(d => d.id === desk.id);
-        if (realDesk) {
-            realDesk.status = 'eliminated';
-            realDesk.eliminatedRound = round;
+    for (const cell of toEliminate) {
+        const realCell = cells.find(d => d.id === cell.id);
+        if (realCell) {
+            realCell.status = 'eliminated';
+            realCell.eliminatedRound = round;
             logs.push(logEntry(round, 'round_end',
-                `${realDesk.name} ELIMINATED (PnL: ${realDesk.portfolio.totalPnL >= 0 ? '+' : ''}${realDesk.portfolio.totalPnL.toFixed(2)} SOL)`,
-                realDesk.id));
+                `${realCell.name} CELL ELIMINATED (PnL: ${realCell.portfolio.totalPnL >= 0 ? '+' : ''}${realCell.portfolio.totalPnL.toFixed(2)} SOL)`,
+                realCell.id));
         }
     }
 
-    const remaining = desks.filter(d => d.status !== 'eliminated').length;
-    logs.push(logEntry(round, 'system', `${eliminateCount} desk(s) eliminated. ${remaining} remain.`));
+    const remaining = cells.filter(d => d.status !== 'eliminated').length;
+    logs.push(logEntry(round, 'system', `${eliminateCount} cell(s) eliminated. ${remaining} remain.`));
 
     return logs;
 }
@@ -503,7 +500,7 @@ export function logEntry(
     round: number,
     type: PnLLogEntry['type'],
     message: string,
-    deskId?: string,
+    cellId?: string,
 ): PnLLogEntry {
-    return { timestamp: Date.now(), round, type, message, deskId };
+    return { timestamp: Date.now(), round, type, message, cellId };
 }

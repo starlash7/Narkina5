@@ -6,7 +6,6 @@ import { Home } from './pages/Home';
 import { About } from './pages/About';
 import { Marketplace } from './pages/Marketplace';
 import { Dashboard } from './pages/Dashboard';
-import { Competition } from './pages/Competition';
 import { PnLArena } from './pages/PnLArena';
 
 const queryClient = new QueryClient();
@@ -22,7 +21,6 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/competition" element={<Competition />} />
             <Route path="/pnl-arena" element={<PnLArena />} />
           </Routes>
           <Footer />

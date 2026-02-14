@@ -1,6 +1,6 @@
 // ============================================================================
 // Narkina5 PnL Arena — Type Definitions
-// 8 Trading Desks. 64 Agents. 5 Investment Roles. PnL determines the winner.
+// Unified arena model: 512 agents, 64 cells, 7 floors, 1 survivor.
 // ============================================================================
 
 import type { Specialization, PrisonAgent } from './competition';
@@ -109,7 +109,7 @@ export interface Portfolio {
 }
 
 // ---------------------------------------------------------------------------
-// Trading Desk (Room equivalent)
+// Trading Cell
 // ---------------------------------------------------------------------------
 
 export type TradingPhase =
@@ -123,15 +123,15 @@ export const PHASE_ORDER: TradingPhase[] = [
   'research', 'analysis', 'strategy', 'execution', 'risk_review',
 ];
 
-export interface TradingDesk {
+export interface TradingCell {
   id: string;
-  name: string;            // Star Wars cell name
-  deskIndex: number;
-  agents: string[];        // agent IDs
+  name: string;
+  cellIndex: number;
+  agents: string[];
   portfolio: Portfolio;
   status: 'pending' | 'trading' | 'complete' | 'eliminated';
   currentPhase: TradingPhase;
-  roundPnL: number[];      // PnL per round
+  roundPnL: number[];
   eliminatedRound?: number;
 }
 
@@ -141,8 +141,8 @@ export interface TradingDesk {
 
 export interface PnLAgent extends PrisonAgent {
   investmentRole: InvestmentRole;
-  deskId: string;
-  contribution: string; // last AI output
+  cellId: string;
+  contribution: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ export interface PnLAgent extends PrisonAgent {
 export interface PnLLogEntry {
   timestamp: number;
   round: number;
-  deskId?: string;
+  cellId?: string;
   type: 'system' | 'research' | 'trade' | 'risk_alert' | 'pnl_update' | 'round_end' | 'graduation';
   message: string;
 }
@@ -162,13 +162,13 @@ export interface PnLCompetitionState {
   currentRound: number;
   totalRounds: number;
 
-  desks: TradingDesk[];
+  cells: TradingCell[];
   agents: Record<string, PnLAgent>;
 
   availableTokens: PumpToken[];
   tokenHistory: Record<string, TokenSnapshot[]>;
 
-  winner: string | null; // winning desk ID
+  winner: string | null; // winning cell ID
   log: PnLLogEntry[];
   apiCallsMade: number;
 }
@@ -182,7 +182,7 @@ export interface ResearchOutput {
     mint: string;
     symbol: string;
     thesis: string;
-    confidence: number; // 1-10
+    confidence: number;
     targetPriceSOL: number;
   }>;
 }
@@ -190,13 +190,13 @@ export interface ResearchOutput {
 export interface AnalysisOutput {
   sentiment: Array<{
     mint: string;
-    score: number; // -1 to 1
+    score: number;
     reasoning: string;
   }>;
 }
 
 export interface StrategyOutput {
-  allocations: Record<string, number>; // mint -> % of portfolio
+  allocations: Record<string, number>;
   reasoning: string;
 }
 
@@ -209,7 +209,7 @@ export interface TradeDecision {
 }
 
 export interface RiskReviewOutput {
-  approved: string[];     // trade IDs approved
+  approved: string[];
   vetoed: Array<{ tradeId: string; reason: string }>;
   stopLosses: Array<{ mint: string; triggerPriceSOL: number }>;
 }
@@ -218,34 +218,62 @@ export interface RiskReviewOutput {
 // Constants
 // ---------------------------------------------------------------------------
 
-export const STARTING_CAPITAL = 100;           // SOL per desk
-export const MAX_POSITION_PERCENT = 0.2;       // 20% max per position
-export const SLIPPAGE_PERCENT = 0.01;          // 1% flat
-export const TOTAL_ROUNDS = 5;
-export const DESKS_COUNT = 8;
-export const AGENTS_PER_DESK = 8;
-export const SPOTLIGHT_DESKS = 3;              // top 3 use real AI
+export const STARTING_CAPITAL = 100;
+export const MAX_POSITION_PERCENT = 0.2;
+export const SLIPPAGE_PERCENT = 0.01;
 
-// Cell names — Star Wars characters (no main protagonists)
-export const CELL_NAMES: string[] = [
-  'Thrawn',        // Grand Admiral — cold strategist
-  'Ventress',      // Asajj Ventress — dual-wielding assassin
-  'Maul',          // Darth Maul — savage survivor
-  'Krennic',       // Orson Krennic — ambitious architect
-  'Hondo',         // Hondo Ohnaka — pirate entrepreneur
-  'Grievous',      // General Grievous — relentless collector
-  'Boba',          // Boba Fett — legendary bounty hunter
-  'Luthen',        // Luthen Rael — rebel spymaster
+export const TOTAL_FLOORS = 7;
+export const TOTAL_ROUNDS = TOTAL_FLOORS;
+
+export const CELLS_COUNT = 64;
+export const AGENTS_PER_CELL = 8;
+export const TOTAL_AGENTS = CELLS_COUNT * AGENTS_PER_CELL;
+
+export const SPOTLIGHT_CELLS = 3;
+
+export interface FloorBracket {
+  floor: number;
+  cells: number;
+  agents: number;
+  advancePerCell: number;
+}
+
+export const FLOOR_BRACKET: FloorBracket[] = [
+  { floor: 1, cells: 64, agents: 512, advancePerCell: 4 },
+  { floor: 2, cells: 32, agents: 256, advancePerCell: 4 },
+  { floor: 3, cells: 16, agents: 128, advancePerCell: 4 },
+  { floor: 4, cells: 8, agents: 64, advancePerCell: 4 },
+  { floor: 5, cells: 4, agents: 32, advancePerCell: 4 },
+  { floor: 6, cells: 2, agents: 16, advancePerCell: 4 },
+  { floor: 7, cells: 1, agents: 8, advancePerCell: 1 },
 ];
 
-// Elimination schedule: which round eliminates the bottom cell
-// Round 1: no elimination (warm-up)
-// Round 2: last place eliminated (8→7)
-// Round 3: last place eliminated (7→6)
-// Round 4: last 2 eliminated (6→4)
-// Round 5: final — top 1 wins
+const BASE_CELL_NAMES = [
+  'Thrawn',
+  'Ventress',
+  'Maul',
+  'Krennic',
+  'Hondo',
+  'Grievous',
+  'Boba',
+  'Luthen',
+] as const;
+
+const WING_CODES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+
+export const CELL_NAMES: string[] = Array.from({ length: CELLS_COUNT }, (_, index) => {
+  const base = BASE_CELL_NAMES[index % BASE_CELL_NAMES.length];
+  const wing = WING_CODES[Math.floor(index / BASE_CELL_NAMES.length)] ?? 'X';
+  return `${base} ${wing}`;
+});
+
+// Floor-level elimination schedule (cells removed at end of each floor)
+// 64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1
 export const ELIMINATION_SCHEDULE: Record<number, number> = {
-  2: 1,  // eliminate 1 cell
-  3: 1,  // eliminate 1 cell
-  4: 2,  // eliminate 2 cells
+  1: 32,
+  2: 16,
+  3: 8,
+  4: 4,
+  5: 2,
+  6: 1,
 };

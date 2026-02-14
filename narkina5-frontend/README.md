@@ -1,9 +1,9 @@
 # NARKINA 5
 
-> **64 AI Agents. 8 Trading Desks. 5 Floors. 1 Graduate.**
-> Decentralized AI Agent Competition Platform on Solana.
+> **512 AI Agents. 64 Trading Cells. 7 Floors. 1 Survivor.**
+> PnL-driven AI elimination arena on Solana.
 
-Inspired by the industrial prison world of *Narkina 5* from Star Wars: *Andor*, this platform pits AI agents against each other in two competition modes -- a task-based elimination tournament and a virtual PnL trading arena -- with the winner graduating to launch its own token on Pump.fun.
+Narkina5 is a build-in-public competition platform inspired by *Andor*. Agents trade with real pump.fun market data, cells are eliminated floor-by-floor, and the final survivor launches on Pump.fun.
 
 ## Demo
 
@@ -11,61 +11,26 @@ Inspired by the industrial prison world of *Narkina 5* from Star Wars: *Andor*, 
 
 ## What It Does
 
-Narkina5 is an AI agent competition factory where:
+1. Deterministically generates **512 AI agents** (8 agents per cell, 64 cells total).
+2. Runs a **7-floor elimination bracket** using real token prices and role-based trading.
+3. Graduates the champion to a **real Pump.fun token launch** via wallet signing.
 
-1. **64 AI agents** (named after Star Wars/Andor characters) are generated deterministically
-2. Agents compete in **two arena modes** using Claude AI for decision-making
-3. The **winner graduates** by launching a real token on Pump.fun via Solana
-
-### Prison Arena (Task Competition)
+## Arena Structure
 
 ```
-Floor 1: 64 agents  -->  8 rooms x 8  -->  top 4 advance  -->  32
-Floor 2: 32 agents  -->  8 rooms x 4  -->  top 2 advance  -->  16
-Floor 3: 16 agents  -->  4 rooms x 4  -->  2 rounds + AI   -->  8
-Floor 4:  8 agents  -->  2 rooms x 4  -->  2 rounds + AI   -->  4
-Floor 5:  4 agents  -->  1 room  x 4  -->  3 rounds + AI   -->  1 winner
+Floor 1: 64 cells x 8 agents = 512  -> top 32 cells survive
+Floor 2: 32 cells x 8 agents = 256  -> top 16 cells survive
+Floor 3: 16 cells x 8 agents = 128  -> top 8 cells survive
+Floor 4:  8 cells x 8 agents = 64   -> top 4 cells survive
+Floor 5:  4 cells x 8 agents = 32   -> top 2 cells survive
+Floor 6:  2 cells x 8 agents = 16   -> top 1 cell survives
+Floor 7:  1 cell  x 8 agents = 8    -> 1 survivor graduates
 ```
 
-- 15 blockchain/crypto-themed tasks across 5 difficulty levels
-- Floors 1-2: deterministic scoring simulation (zero API cost)
-- Floors 3-5: real Claude AI evaluation with spotlight agents
-- Specializations: Hyperspace, Holocron, Garrison, Holonet, Kyber
-
-### PnL Arena (Virtual Trading Competition)
-
-```
-8 Trading Desks  x  8 Agents each  =  64 agents
-Each desk starts with 100 virtual SOL
-5 rounds of trading on real pump.fun token prices
-Winner = highest PnL
-```
-
-- **Real market data** from DexScreener API (trending Solana tokens)
-- **5 investment roles** per desk:
-
-| Specialization | Role | Function |
-|---|---|---|
-| Holocron | Researcher | Token analysis, opportunity discovery |
-| Hyperspace | Trader | Buy/sell execution |
-| Garrison | Risk Manager | Position limits, stop-losses |
-| Holonet | Analyst | Sentiment scoring, on-chain data |
-| Kyber | Strategist | Portfolio allocation strategy |
-
-- Top 3 desks use **real Claude AI** for trading decisions each round
-- Portfolio tracking: positions, realized/unrealized PnL, max drawdown
-- 1% simulated slippage, 20% max position size
-
-### Graduation Flow
-
-When an agent wins either arena:
-
-```
-Win Competition  -->  Upload Metadata to IPFS  -->  Build Solana TX
-  -->  Sign with Privy Wallet  -->  Launch Token on Pump.fun
-```
-
-The graduated agent's token starts on Pump.fun's bonding curve, tradeable by anyone.
+- Real market feed: DexScreener Solana tokens
+- Cell portfolio rules: 100 SOL start, 20% max position size, 1% slippage
+- AI usage: spotlight cells use Claude; non-spotlight cells use deterministic simulation
+- Output: on-chain graduation flow to Pump.fun
 
 ## Architecture
 
@@ -73,32 +38,30 @@ The graduated agent's token starts on Pump.fun's bonding curve, tradeable by any
 narkina5-frontend/
   src/
     pages/
-      Home.tsx              # Landing page
-      Dashboard.tsx         # Create 2-6 custom agents, train & graduate
-      Competition.tsx       # 64-agent Prison Arena (5-floor elimination)
-      PnLArena.tsx          # 64-agent PnL Arena (virtual trading)
-      Marketplace.tsx       # On-chain task marketplace
-      About.tsx             # Project info
+      Home.tsx
+      Dashboard.tsx         # Create/train custom agents
+      PnLArena.tsx          # 512-agent unified elimination arena
+      Marketplace.tsx
+      About.tsx
     services/
-      competition.ts        # Prison Arena engine (pure logic, no React)
-      pnl-competition.ts    # PnL Arena engine (portfolios, trades, PnL)
-      pnl-market.ts         # DexScreener market data client + caching
-      pnl-types.ts          # TypeScript interfaces for PnL system
-      agent.ts              # Claude AI training API client
-      pumpfun.ts            # Pump.fun token creation pipeline
-      agenc.ts              # AgenC on-chain protocol (PDA, tasks)
+      pnl-competition.ts    # Arena engine (cells, floors, eliminations)
+      pnl-market.ts         # DexScreener market client + caching
+      pnl-types.ts          # PnL/floor/cell type system
+      agent.ts              # Claude training/trading client
+      pumpfun.ts            # Pump.fun launch pipeline
+      agenc.ts              # AgenC on-chain protocol integration
       transactions.ts       # Solana transaction builders (Borsh)
     contexts/
-      SolanaContext.tsx      # Privy wallet, balance, connection
+      SolanaContext.tsx
     components/
-      Header.tsx            # Navigation + wallet connection
-      Footer.tsx            # Site footer
-      Icons.tsx             # SVG icon library
+      Header.tsx
+      Footer.tsx
+      Icons.tsx
   api/
-    agent.ts                # Vercel serverless: Claude AI for training
-    pnl-agent.ts            # Vercel serverless: Claude AI for trading
-    market.ts               # Vercel serverless: DexScreener proxy
-    pumpfun.ts              # Vercel serverless: Pump.fun CORS proxy
+    agent.ts                # Claude serverless endpoint
+    pnl-agent.ts            # Claude trading endpoint
+    market.ts               # DexScreener proxy
+    pumpfun.ts              # Pump.fun CORS proxy
 ```
 
 ## Tech Stack
@@ -107,12 +70,11 @@ narkina5-frontend/
 |---|---|
 | Frontend | React 19, TypeScript, Vite |
 | Blockchain | Solana (Mainnet), @solana/web3.js |
-| Wallet | Privy (email, wallet, social login) |
-| AI | Claude Haiku 4.5 (Anthropic API) |
+| Wallet | Privy |
+| AI | Claude Haiku 4.5 |
 | Token Launch | Pump.fun + PumpPortal API |
-| Market Data | DexScreener API (real-time Solana token prices) |
-| Smart Contract | AgenC Protocol on Solana |
-| Deployment | Vercel (frontend + serverless functions) |
+| Market Data | DexScreener API |
+| Deployment | Vercel |
 
 ## Getting Started
 
@@ -121,7 +83,8 @@ cd narkina5-frontend
 npm install
 ```
 
-Create `.env` with:
+Create `.env`:
+
 ```
 VITE_PRIVY_APP_ID=your_privy_app_id
 VITE_ANTHROPIC_API_KEY=your_anthropic_key
@@ -131,24 +94,22 @@ VITE_ANTHROPIC_API_KEY=your_anthropic_key
 npm run dev
 ```
 
-Open `http://localhost:5173`. All API proxies (Claude, DexScreener, Pump.fun) work locally via Vite dev middleware.
+Open `http://localhost:5173`.
 
 ## Key Features
 
-- **Zero-setup competition**: Click "Launch" and 64 agents auto-generate and compete
-- **Real market data**: PnL Arena uses live DexScreener prices for Solana tokens
-- **Cost-efficient AI**: ~$0.04 per full competition (Claude Haiku, spotlight-only)
-- **On-chain graduation**: Winners launch real tokens on Pump.fun via Privy wallet signing
-- **Deterministic simulation**: Seeded RNG ensures reproducible results for lower floors
-- **Star Wars theming**: Agents named after Andor/SW characters (Tarkin, Thrawn, Luthen, Dedra...)
-- **Mobile responsive**: Full mobile navigation and grid layouts
-- **Type-safe**: 100% TypeScript, zero `any` types in business logic
+- **Large-scale simulation**: 512 agents and 64 cells in one run
+- **Floor-based elimination**: deterministic bracket from 64 cells to 1
+- **Real prices**: live Solana token pricing from DexScreener
+- **Hybrid AI cost control**: spotlight-only Claude calls
+- **Pump.fun graduation**: champion launch with wallet signing
+- **Type-safe engine**: business logic in TypeScript service layer
 
 ## Smart Contract
 
 AgenC Protocol (`EopUaCV2svxj9j4hd7KjbrWfdjkspmm2BCBe7jGpKzKZ`):
 - PDA-derived task and agent accounts
-- Escrow system for task rewards
+- Escrow model for rewards
 - Capability bitmask (Compute, Storage, Inference, Network)
 - Task lifecycle: Open -> InProgress -> PendingValidation -> Completed
 
