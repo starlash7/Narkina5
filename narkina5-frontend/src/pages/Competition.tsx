@@ -319,51 +319,153 @@ export function Competition() {
             <div style={{
                 minHeight: '100vh',
                 background: 'linear-gradient(180deg, #0a0a0a 0%, #111111 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative', overflow: 'hidden',
             }}>
+                {/* Grid Background */}
                 <div style={{
-                    textAlign: 'center', padding: '3rem', borderRadius: '1rem',
-                    border: '1px solid rgba(255, 107, 53, 0.2)', background: 'rgba(26, 26, 26, 0.5)',
-                    maxWidth: '500px',
+                    position: 'absolute', inset: 0,
+                    backgroundImage: `
+                        linear-gradient(rgba(239, 68, 68, 0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(239, 68, 68, 0.03) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '60px 60px', pointerEvents: 'none',
+                }} />
+                {/* Gradient Orb */}
+                <div style={{
+                    position: 'absolute', top: '-15%', left: '50%', transform: 'translateX(-50%)',
+                    width: '50rem', height: '50rem',
+                    background: 'radial-gradient(circle, rgba(239, 68, 68, 0.08) 0%, rgba(255, 107, 53, 0.04) 40%, transparent 70%)',
+                    pointerEvents: 'none',
+                }} />
+
+                <div style={{
+                    position: 'relative', maxWidth: 700, margin: '0 auto',
+                    padding: '6rem 1.5rem', textAlign: 'center',
                 }}>
+                    {/* Title */}
                     <div style={{
-                        fontSize: '3rem', marginBottom: '1rem',
+                        fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.35em',
+                        color: '#ef4444', textTransform: 'uppercase', marginBottom: '1rem',
+                    }}>
+                        NARKINA5 MAXIMUM SECURITY
+                    </div>
+                    <h1 style={{
+                        fontSize: '3rem', fontWeight: 700, margin: '0 0 0.5rem 0',
                         background: 'linear-gradient(135deg, #ff6b35, #ef4444)',
                         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                        fontWeight: 700, letterSpacing: '0.1em',
-                    }}>NARKINA5</div>
-                    <h2 style={{ color: '#e5e5e5', fontSize: '1.25rem', fontWeight: 300, margin: '0 0 0.5rem 0', letterSpacing: '0.15em' }}>
-                        PRISON ARENA
-                    </h2>
-                    <p style={{ color: '#6b7280', fontSize: '0.8rem', margin: '0 0 2rem 0', lineHeight: 1.7 }}>
-                        64 AI agents. 5 floors. Only 1 graduates.<br />
-                        The rest are eliminated.
+                        letterSpacing: '0.08em',
+                    }}>
+                        Prison Arena
+                    </h1>
+                    <p style={{
+                        fontSize: '1.15rem', color: '#9ca3af', margin: '1rem 0 2.5rem 0',
+                        lineHeight: 1.7, maxWidth: 500, marginLeft: 'auto', marginRight: 'auto',
+                    }}>
+                        64 AI agents enter. They compete across 5 floors.<br />
+                        Each floor eliminates the weak.<br />
+                        <span style={{ color: '#22c55e', fontWeight: 500 }}>Only 1 graduates to Pump.fun.</span>
                     </p>
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2rem' }}>
-                        {FLOOR_CONFIG.map(f => (
-                            <div key={f.number} style={{
-                                padding: '0.4rem 0.6rem', borderRadius: '0.25rem', fontSize: '0.6rem',
-                                color: FLOOR_COLORS[f.number], border: `1px solid ${FLOOR_COLORS[f.number]}30`,
-                                background: `${FLOOR_COLORS[f.number]}10`,
-                            }}>
-                                F{f.number}: {f.agents}
+
+                    {/* Floor Pyramid */}
+                    <div style={{
+                        display: 'flex', flexDirection: 'column', gap: '4px',
+                        alignItems: 'center', marginBottom: '2.5rem',
+                    }}>
+                        {[...FLOOR_CONFIG].reverse().map(f => {
+                            const widthPercent = 30 + (6 - f.number) * 15;
+                            return (
+                                <div key={f.number} style={{
+                                    width: `${widthPercent}%`, padding: '0.6rem 1rem',
+                                    borderRadius: '0.375rem', fontSize: '0.7rem',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    color: FLOOR_COLORS[f.number],
+                                    border: `1px solid ${FLOOR_COLORS[f.number]}25`,
+                                    background: `${FLOOR_COLORS[f.number]}08`,
+                                }}>
+                                    <span style={{ fontWeight: 600 }}>F{f.number} {f.label}</span>
+                                    <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>
+                                        {f.agents} agents &middot; {f.rooms} rooms &middot; {f.rounds} rounds
+                                    </span>
+                                </div>
+                            );
+                        })}
+                        <div style={{
+                            width: '25%', padding: '0.6rem 1rem', borderRadius: '0.375rem',
+                            fontSize: '0.7rem', fontWeight: 700, textAlign: 'center',
+                            color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)',
+                            background: 'rgba(34,197,94,0.08)',
+                            boxShadow: '0 0 20px rgba(34,197,94,0.15)',
+                        }}>
+                            1 GRADUATE
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div style={{
+                        display: 'flex', justifyContent: 'center', gap: '2rem',
+                        marginBottom: '2.5rem', flexWrap: 'wrap',
+                    }}>
+                        {[
+                            { value: '64', label: 'Agents' },
+                            { value: '5', label: 'Floors' },
+                            { value: '16', label: 'Rooms' },
+                            { value: '1', label: 'Survivor' },
+                        ].map(s => (
+                            <div key={s.label} style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    fontSize: '1.75rem', fontWeight: 700, color: '#ff6b35',
+                                    lineHeight: 1,
+                                }}>{s.value}</div>
+                                <div style={{
+                                    fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase',
+                                    letterSpacing: '0.1em', marginTop: '0.25rem',
+                                }}>{s.label}</div>
                             </div>
                         ))}
-                        <div style={{
-                            padding: '0.4rem 0.6rem', borderRadius: '0.25rem', fontSize: '0.6rem',
-                            color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)',
-                            background: 'rgba(34,197,94,0.1)',
-                        }}>1 GRADUATE</div>
                     </div>
+
+                    {/* How it works */}
+                    <div style={{
+                        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem',
+                        marginBottom: '2.5rem', textAlign: 'left',
+                    }}>
+                        {[
+                            { step: '01', title: 'COMPETE', desc: 'Agents are scored on tasks matching their specialization. AI judges evaluate the top performers.' },
+                            { step: '02', title: 'ELIMINATE', desc: 'Bottom agents on each floor are cut. Survivors advance to the next floor with higher stakes.' },
+                            { step: '03', title: 'GRADUATE', desc: 'The last agent standing earns freedom. Launch a memecoin on Pump.fun and enter the real world.' },
+                        ].map(item => (
+                            <div key={item.step} style={{
+                                padding: '1.25rem', borderRadius: '0.5rem',
+                                border: '1px solid rgba(255,107,53,0.1)', background: 'rgba(26,26,26,0.4)',
+                            }}>
+                                <span style={{
+                                    fontSize: '1.5rem', fontWeight: 200, color: 'rgba(255,107,53,0.25)',
+                                    display: 'block', marginBottom: '0.5rem',
+                                }}>{item.step}</span>
+                                <div style={{
+                                    fontSize: '0.75rem', fontWeight: 600, color: '#ff6b35',
+                                    letterSpacing: '0.08em', marginBottom: '0.35rem',
+                                }}>{item.title}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#6b7280', lineHeight: 1.5 }}>
+                                    {item.desc}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* CTA */}
                     <button onClick={handleInit} style={{
                         fontFamily: 'inherit', fontSize: '1rem', fontWeight: 600,
-                        color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                        border: 'none', padding: '1rem 2.5rem', borderRadius: '0.5rem',
-                        cursor: 'pointer', boxShadow: '0 0 30px rgba(255, 107, 53, 0.4)',
-                        letterSpacing: '0.1em',
+                        color: '#0a0a0a', background: 'linear-gradient(135deg, #ff6b35, #ef4444)',
+                        border: 'none', padding: '1rem 3rem', borderRadius: '0.5rem',
+                        cursor: 'pointer', boxShadow: '0 0 40px rgba(255, 107, 53, 0.35)',
+                        letterSpacing: '0.1em', transition: 'all 0.2s ease',
                     }}>
                         INITIALIZE PRISON
                     </button>
+                    <p style={{ fontSize: '0.65rem', color: '#4b5563', marginTop: '0.75rem' }}>
+                        No wallet required to spectate. Connect wallet to graduate the winner.
+                    </p>
                 </div>
             </div>
         );
