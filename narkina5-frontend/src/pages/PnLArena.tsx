@@ -334,25 +334,44 @@ export function PnLArena() {
         setGradError(null);
 
         try {
-            const description = generateTokenDescription(
+            const description = generateTokenDescription({
+                name: bestAgent.name,
+                symbol: bestAgent.symbol,
+                description: `PnL Arena Champion | ${cell.portfolio.totalPnL >= 0 ? '+' : ''}${cell.portfolio.totalPnL.toFixed(2)} SOL PnL`,
+                specialization: bestAgent.specialization,
+                trustScore: 100,
+            });
+            const metadataUri = await uploadMetadata(
                 bestAgent.name,
+                bestAgent.symbol,
+                description,
                 bestAgent.specialization,
-                `PnL Arena Champion | ${cell.portfolio.totalPnL >= 0 ? '+' : ''}${cell.portfolio.totalPnL.toFixed(2)} SOL PnL`,
             );
-            const { metadataUri } = await uploadMetadata(bestAgent.name, bestAgent.symbol, description);
 
             setGradStatus('building');
-            const { publicKey: mintPub, keypair: mintKeypair } = generateMintKeypair();
-            const unsignedTx = await buildCreateTokenTx(publicKey, mintPub, metadataUri, bestAgent.name, bestAgent.symbol);
+            const mintKeypair = generateMintKeypair();
+            const mintPub = mintKeypair.publicKey.toBase58();
+            const unsignedTx = await buildCreateTokenTx(
+                publicKey.toBase58(),
+                mintPub,
+                metadataUri,
+                bestAgent.name,
+                bestAgent.symbol,
+            );
 
             setGradStatus('signing');
             const mintSigned = signWithMintKeypair(unsignedTx, mintKeypair);
-            const fullySigned = await signTransaction({ transaction: { bytes: mintSigned }, address: wallets[0].address });
-            const signedBytes = fullySigned.signedTransaction.bytes;
+            const wallet = wallets.find(w => w.address === publicKey.toBase58()) ?? wallets[0];
+            if (!wallet) throw new Error('No wallet connected');
+            const { signedTransaction } = await signTransaction({
+                transaction: mintSigned,
+                wallet,
+                chain: 'solana:devnet',
+            });
 
             setGradStatus('confirming');
             const connection = new Connection(MAINNET_RPC, 'confirmed');
-            const sig = await connection.sendRawTransaction(signedBytes, { skipPreflight: true, maxRetries: 3 });
+            const sig = await connection.sendRawTransaction(signedTransaction, { skipPreflight: true, maxRetries: 3 });
             await connection.confirmTransaction(sig, 'confirmed');
 
             const pumpfunUrl = getPumpfunUrl(mintPub);

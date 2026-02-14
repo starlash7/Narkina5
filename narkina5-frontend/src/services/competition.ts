@@ -89,11 +89,11 @@ export interface CompetitionState {
 // ---------------------------------------------------------------------------
 
 export const SPEC_COLORS: Record<Specialization, string> = {
-  Compute: '#ff6b35',
-  Inference: '#8b5cf6',
-  Security: '#ef4444',
-  Network: '#3b82f6',
-  Storage: '#22c55e',
+  Hyperspace: '#ff6b35',
+  Holocron: '#8b5cf6',
+  Garrison: '#ef4444',
+  Holonet: '#3b82f6',
+  Kyber: '#22c55e',
 };
 
 export const FLOOR_CONFIG = [

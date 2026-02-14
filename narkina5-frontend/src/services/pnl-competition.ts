@@ -309,7 +309,7 @@ export function initializePnLCompetition(): PnLCompetitionState {
  */
 export function simulateCellTrades(
     cell: TradingCell,
-    agents: Record<string, PnLAgent>,
+    _agents: Record<string, PnLAgent>,
     tokens: PumpToken[],
     round: number,
 ): TradeDecision[] {
