@@ -1,153 +1,151 @@
 # NARKINA 5
 
 > **64 Cells · 512 Agents · 7 Floors · 1 Survivor**  
-> **PnL Elimination Arena on Solana, graduating winners to Pump.fun**
+> **PnL Elimination Arena on Solana that graduates winners to Pump.fun**
 
-Narkina5 is an AI agent competition arena inspired by *Andor*.  
-Agents are seeded into trading cells, compete on real market data, and are eliminated floor by floor until one winner remains.
+Narkina5 is a tournament system for token launch selection.
+Instead of launching first and evaluating later, we run a full elimination arena and promote only the final survivor.
 
-## Live
+## Live Links
 
-- App: [narkina5.vercel.app](https://narkina5.vercel.app)
-- Arena: `https://narkina5.vercel.app/pnl-arena`
-- Repo: [github.com/starlash7/Narkina5](https://github.com/starlash7/Narkina5)
+- Product: [narkina5.vercel.app](https://narkina5.vercel.app)
+- Arena: [narkina5.vercel.app/pnl-arena](https://narkina5.vercel.app/pnl-arena)
+- Repository: [github.com/starlash7/Narkina5](https://github.com/starlash7/Narkina5)
 
-## Why This Is Fresh
+## Judge TL;DR
 
-Most launch flows pick a token candidate first and ask quality questions later.
-Narkina5 flips that model:
+- **Problem**: launch candidates are usually selected by narrative velocity, not trading resilience.
+- **Approach**: run a large deterministic bracket (512 agents, 64 cells, 7 floors).
+- **Decision Rule**: eliminate by floor-level PnL performance until one cell remains.
+- **Outcome**: winner is graduated into Pump.fun launch flow.
 
-- 512 agents compete first, launch later
-- launch eligibility is earned through multi-floor PnL survival
-- one winner is promoted from bracket performance, not hype alone
+## Why This Feels New
 
-This makes Narkina5 a **pre-launch quality filter** for Pump.fun.
+Narkina5 treats launch selection as a **competitive systems problem**:
 
-## Arena Concept
+- launch quality is earned through survival, not picked manually
+- multi-agent diversity is preserved until elimination pressure removes weak cells
+- graduation is tied to an on-chain launch pipeline, not a static leaderboard
 
-### `CREATE`
-Initialize **64 trading cells** with **8 agents per cell** (total **512 agents**).
+## 2-Minute Judge Walkthrough
 
-### `COMPETE`
-Each cell trades with role-based decisions using live Solana token market data.
+1. Open `Home` and enter `PnL Arena`
+2. Initialize the bracket (`64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1`)
+3. Observe each floor: phase execution, PnL update, elimination
+4. Confirm final winner and graduation flow to Pump.fun
 
-### `ELIMINATE`
-At the end of each floor, lower-performing cells are removed from the bracket.
-
-### `GRADUATE`
-The final winning cell graduates and executes a Pump.fun launch flow.
-
-## Elimination Bracket
-
-```text
-Floor 1: 64 cells x 8 agents = 512  -> top 32 cells survive
-Floor 2: 32 cells x 8 agents = 256  -> top 16 cells survive
-Floor 3: 16 cells x 8 agents = 128  -> top 8 cells survive
-Floor 4:  8 cells x 8 agents = 64   -> top 4 cells survive
-Floor 5:  4 cells x 8 agents = 32   -> top 2 cells survive
-Floor 6:  2 cells x 8 agents = 16   -> top 1 cell survives
-Floor 7:  1 cell  x 8 agents = 8    -> 1 survivor graduates
-```
-
-## System Architecture (Judge View)
+## Architecture
 
 ```text
 User + Wallet (Privy)
         |
         v
-React UI (Home / PnLArena / About)
+React App (Home / PnLArena / About)
         |
         v
 Arena Engine (state machine, floors, eliminations)
-        |                     |                       |
-        |                     |                       |
-        v                     v                       v
-Market Service         AI Decision Service      Launch Service
-(DexScreener)          (Claude via API)         (Pump.fun/PumpPortal)
-        \                     |                       /
-         \                    |                      /
-          ---------------- Solana Mainnet ----------------
+   |                 |                    |
+   v                 v                    v
+Market Service     AI Service         Launch Service
+(DexScreener)      (Claude)           (Pump.fun / PumpPortal)
+        \            |                /
+         \           |               /
+          -------- Solana Mainnet --------
 ```
 
-## Execution Pipeline
+### Subsystems
 
-For each floor:
+- **Orchestration Layer**
+  - floor progression
+  - elimination scheduling
+  - winner finalization
+- **Decision Layer**
+  - role-based cell decisions
+  - spotlight AI calls with deterministic fallback
+- **Execution Layer**
+  - portfolio updates
+  - transaction builders
+  - graduation launch integration
 
-1. Seed or carry over eligible cells
-2. Pull market snapshot from DexScreener
-3. Run cell phases (`research -> analysis -> strategy -> execution -> risk_review`)
-4. Calculate portfolio PnL and update rankings
-5. Eliminate lower cells based on bracket rule
-6. Advance survivors to next floor
+## Arena Engine Design
 
-After floor 7, the final cell triggers graduation and launch flow.
+### Bracket Model
 
-## Core Design Choices
+```text
+Floor 1: 64 cells x 8 agents = 512  -> top 32 survive
+Floor 2: 32 cells x 8 agents = 256  -> top 16 survive
+Floor 3: 16 cells x 8 agents = 128  -> top 8 survive
+Floor 4:  8 cells x 8 agents = 64   -> top 4 survive
+Floor 5:  4 cells x 8 agents = 32   -> top 2 survive
+Floor 6:  2 cells x 8 agents = 16   -> top 1 survives
+Floor 7:  1 cell  x 8 agents = 8    -> 1 winner graduates
+```
 
-- **Deterministic tournament**: same bracket logic for reproducibility
-- **Hybrid AI budget model**: spotlight cells call Claude, others use deterministic simulation
-- **Real data grounding**: market input from live Solana token feed
-- **On-chain finality**: graduation is connected to launch transaction flow
+### Cell Phase Pipeline
 
-## What Makes It Strong for Pump.fun
+`research -> analysis -> strategy -> execution -> risk_review`
 
-- **Quality filter before launch**: launch candidate is selected through multi-floor PnL competition.
-- **Scale-first simulation**: large deterministic bracket (512 agents) in a single run.
-- **Cost-aware AI architecture**: spotlight cells use Claude, others run deterministic simulation.
-- **Real market grounding**: DexScreener feed with local fallback behavior.
+Each phase updates the same typed state contracts and feeds the floor-level ranking pass.
 
-## Tech Stack
+### Determinism + Cost Control
 
-| Layer | Stack |
+- deterministic elimination and scoring for replayability
+- selective AI usage on spotlight cells to keep costs bounded
+- same market snapshot basis per floor for fair comparison
+
+## What Is Real vs Simulated
+
+| Component | Status |
 |---|---|
-| Frontend | React 19 + TypeScript + Vite |
-| Chain | Solana Mainnet + `@solana/web3.js` |
-| Wallet/Auth | Privy |
-| AI | Claude (Haiku 4.5) |
-| Market Data | DexScreener API |
-| Launch | Pump.fun + PumpPortal |
-| Deploy | Vercel |
+| Solana wallet + signing | Real |
+| DexScreener market feed | Real |
+| Floor progression + elimination | Deterministic simulation |
+| AI trade reasoning | Hybrid (Claude + deterministic paths) |
+| Pump.fun graduation pipeline | Integrated flow |
 
-## Project Structure (Responsibility-First)
+## Repository Structure (Responsibility-First)
 
 ```text
 narkina5-frontend/
   src/
     pages/
-      Home.tsx               # Landing narrative and arena entry
-      PnLArena.tsx           # Main competition UI and floor progression
-      About.tsx              # Product/stack explanation
+      Home.tsx               # Product narrative + entry
+      PnLArena.tsx           # Live competition runtime UI
+      About.tsx              # Context and architecture overview
     services/
-      pnl-types.ts           # Canonical types + constants (64/512/7 bracket)
-      pnl-competition.ts     # Arena state machine and elimination logic
-      pnl-market.ts          # DexScreener fetch + fallback + normalization
-      agent.ts               # AI role decision client
-      pumpfun.ts             # Pump.fun launch integration logic
-      agenc.ts               # AgenC protocol integration utilities
-      transactions.ts        # Solana transaction builders
+      pnl-types.ts           # Canonical domain types/constants
+      pnl-competition.ts     # Bracket engine and elimination logic
+      pnl-market.ts          # Market ingest and normalization
+      agent.ts               # AI decision client
+      pumpfun.ts             # Launch integration service
+      agenc.ts               # AgenC protocol helpers
+      transactions.ts        # Solana tx builders
     contexts/
-      SolanaContext.tsx      # Wallet connection and chain context
+      SolanaContext.tsx      # Wallet and connection context
     components/
-      Header.tsx             # Global navigation
-      Footer.tsx             # Global footer and GitHub link
-      Icons.tsx              # Shared icon components
+      Header.tsx
+      Footer.tsx
+      Icons.tsx
   api/
-    market.ts                # Server-side market proxy
-    agent.ts                 # Server-side AI endpoint
-    pnl-agent.ts             # PnL-focused AI decision endpoint
-    pumpfun.ts               # Pump.fun proxy endpoint
+    market.ts                # DexScreener proxy
+    agent.ts                 # Claude endpoint
+    pnl-agent.ts             # PnL decision endpoint
+    pumpfun.ts               # Pump.fun proxy
 ```
 
-## Data Model Highlights
+## Tech Stack
 
-- `PnLCompetitionState`: total competition state (floors, cells, logs, winner)
-- `TradingCell`: per-cell portfolio, phase, elimination status
-- `PnLAgent`: role-specialized agent metadata and cell membership
-- `Portfolio` / `Position` / `Trade`: value, exposure, and transaction records
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite |
+| Chain | Solana Mainnet, `@solana/web3.js` |
+| Wallet | Privy |
+| AI | Claude (Haiku 4.5) |
+| Market Data | DexScreener API |
+| Launch | Pump.fun + PumpPortal |
+| Deployment | Vercel |
 
-Together these models keep the simulation transparent and replayable.
-
-## Local Development
+## Local Setup
 
 ```bash
 cd narkina5-frontend
@@ -166,9 +164,3 @@ Run:
 ```bash
 npm run dev
 ```
-
-Open `http://localhost:5173`.
-
-## License
-
-MIT
