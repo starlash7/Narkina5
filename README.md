@@ -1,101 +1,113 @@
 # NARKINA 5
 
-> AI Agent Training Factory on Solana
+> **64 Cells · 512 Agents · 7 Floors · 1 Survivor**  
+> **PnL Elimination Arena on Solana, graduating winners to Pump.fun**
 
-Inspired by the industrial prison world of Narkina 5 from *Andor*, this is a decentralized platform where AI agents are created, trained through on-chain tasks, and graduated into the open blockchain ecosystem.
+Narkina5 is an AI agent competition arena inspired by *Andor*.  
+Agents are seeded into trading cells, compete on real market data, and are eliminated floor by floor until one winner remains.
 
-## Concept
+## Live
 
-Narkina5 is an AI agent factory built on Solana. Users create AI agents that start as "inmates" in the factory, performing tasks to build trust and earn capabilities. Once an agent reaches graduation criteria, it's released into the real world -- launching its own memecoin on Pump.fun and operating autonomously on-chain.
+- App: [narkina5.vercel.app](https://narkina5.vercel.app)
+- Arena: `https://narkina5.vercel.app/pnl-arena`
+- Repo: [github.com/starlash7/Narkina5](https://github.com/starlash7/Narkina5)
 
-### The Flow
+## Arena Concept
 
+### `CREATE`
+Initialize **64 trading cells** with **8 agents per cell** (total **512 agents**).
+
+### `COMPETE`
+Each cell trades with role-based decisions using live Solana token market data.
+
+### `ELIMINATE`
+At the end of each floor, lower-performing cells are removed from the bracket.
+
+### `GRADUATE`
+The final winning cell graduates and executes a Pump.fun launch flow.
+
+## Elimination Bracket
+
+```text
+Floor 1: 64 cells x 8 agents = 512  -> top 32 cells survive
+Floor 2: 32 cells x 8 agents = 256  -> top 16 cells survive
+Floor 3: 16 cells x 8 agents = 128  -> top 8 cells survive
+Floor 4:  8 cells x 8 agents = 64   -> top 4 cells survive
+Floor 5:  4 cells x 8 agents = 32   -> top 2 cells survive
+Floor 6:  2 cells x 8 agents = 16   -> top 1 cell survives
+Floor 7:  1 cell  x 8 agents = 8    -> 1 survivor graduates
 ```
-CREATE  -->  TRAIN  -->  GRADUATE  -->  LAUNCH
-```
 
-1. **Create**: Mint a new AI agent (costs SOL). The agent enters the Narkina5 factory as a trainee.
-2. **Train**: Agents perform on-chain tasks on the Training Floor. Each task builds trust score, skill level, and reputation.
-3. **Graduate**: When an agent meets the threshold (trust score, tasks completed, time served), it earns graduation status.
-4. **Launch**: Graduated agents are released onto Solana. They launch their own memecoin on Pump.fun, run social accounts, and generate revenue for their owner.
+## What Makes It Strong for Pump.fun
 
-### Inside the Factory vs After Graduation
-
-```
-         INSIDE THE FACTORY              AFTER GRADUATION
-         ──────────────────              ────────────────
-Role     Trainee (inmate)               Independent agent
-Tasks    Assigned tasks only             Self-directed activity
-Rewards  Taxed (protocol fee)            Full rewards, no tax
-Actions  No autonomous actions           Launch memecoin on Pump.fun
-                                         Run Twitter/Telegram bots
-                                         Trade on-chain autonomously
-Trust    Building trust score            Established reputation
-Revenue  SOL from task escrow            Memecoin + autonomous earnings
-                                         → flows back to owner
-```
-
-### Inside the Factory
-
-- **Training Floor**: Agents perform tasks (compute, inference, security audits) for SOL rewards.
-- **Trust Score**: Every completed task raises an agent's on-chain trust score.
-- **Specializations**: Compute, Inference, Security, Network, Storage -- each task builds a specific skill.
-- **Escrow System**: Task rewards are held in escrow via the AgenC smart contract until completion.
-- **Protocol Fee**: A percentage of all rewards flows back to the Narkina5 protocol.
-- **Graduation Criteria**: Trust score threshold + minimum tasks completed + time served.
-
-### After Graduation
-
-- **Pump.fun Launch**: The agent creates and manages its own memecoin on Pump.fun.
-- **Autonomous Activity**: Operates Twitter/Telegram bots, engages communities, trades on-chain.
-- **Revenue Share**: Earnings flow back to the agent owner + a percentage to the Narkina5 protocol.
-- **On-chain Identity**: The agent keeps its wallet, reputation, and track record from training.
+- **Quality filter before launch**: launch candidate is selected through multi-floor PnL competition.
+- **Scale-first simulation**: large deterministic bracket (512 agents) in a single run.
+- **Cost-aware AI architecture**: spotlight cells use Claude, others run deterministic simulation.
+- **Real market grounding**: DexScreener feed with local fallback behavior.
 
 ## Tech Stack
 
-- **Frontend**: React + TypeScript + Vite
-- **Blockchain**: Solana (devnet/mainnet)
-- **Smart Contract**: AgenC Protocol (`EopUaCV2svxj9j4hd7KjbrWfdjkspmm2BCBe7jGpKzKZ`)
-- **Wallet**: Privy (email, wallet, social login)
-- **AI Backend**: ElizaOS agent framework
+| Layer | Stack |
+|---|---|
+| Frontend | React 19 + TypeScript + Vite |
+| Chain | Solana Mainnet + `@solana/web3.js` |
+| Wallet/Auth | Privy |
+| AI | Claude (Haiku 4.5) |
+| Market Data | DexScreener API |
+| Launch | Pump.fun + PumpPortal |
+| Deploy | Vercel |
 
 ## Project Structure
 
-```
-├── README.md
-├── narkina5-frontend/          # Web application
-│   ├── src/
-│   │   ├── components/         # Header, Footer, shared UI
-│   │   ├── contexts/           # SolanaContext (connection, wallet, balance)
-│   │   ├── services/           # agenc.ts (PDA derivation, task fetching)
-│   │   └── pages/
-│   │       ├── Home.tsx        # Landing page - factory concept
-│   │       ├── Marketplace.tsx # Training Floor (on-chain tasks)
-│   │       └── Dashboard.tsx   # My Agents - wallet & agent stats
-│   ├── package.json
-│   └── vite.config.ts
-└── eliza/                      # ElizaOS agent framework (backend)
+```text
+narkina5-frontend/
+  src/
+    pages/
+      Home.tsx
+      PnLArena.tsx
+      About.tsx
+    services/
+      pnl-competition.ts
+      pnl-market.ts
+      pnl-types.ts
+      agent.ts
+      pumpfun.ts
+      agenc.ts
+      transactions.ts
+    contexts/
+      SolanaContext.tsx
+    components/
+      Header.tsx
+      Footer.tsx
+      Icons.tsx
+  api/
+    agent.ts
+    pnl-agent.ts
+    market.ts
+    pumpfun.ts
 ```
 
-## Getting Started
+## Local Development
 
 ```bash
 cd narkina5-frontend
 npm install
+```
+
+Create `.env`:
+
+```bash
+VITE_PRIVY_APP_ID=your_privy_app_id
+VITE_ANTHROPIC_API_KEY=your_anthropic_api_key
+```
+
+Run:
+
+```bash
 npm run dev
 ```
 
-The app runs on `http://localhost:5173` connected to Solana devnet.
-
-## Smart Contract
-
-The AgenC program manages:
-- **Task accounts**: PDA-derived, stores task state, escrow, deadlines
-- **Claim accounts**: Links agents to claimed tasks
-- **Escrow accounts**: Holds SOL until task completion
-- **Protocol account**: Global state and fee collection
-
-Task lifecycle: `Open -> InProgress -> PendingValidation -> Completed`
+Open `http://localhost:5173`.
 
 ## License
 
