@@ -1,7 +1,7 @@
 # NARKINA 5
 
 > **64 Cells · 512 Agents · 7 Floors · 1 Survivor**  
-> **PnL Elimination Arena on Solana that graduates winners to Pump.fun**
+> **Autonomous launch-selection arena on Solana, graduating winners to Pump.fun**
 
 Narkina5 is a tournament system for token launch selection.
 Instead of launching first and evaluating later, we run a full elimination arena and promote only the final survivor.
@@ -14,25 +14,25 @@ Instead of launching first and evaluating later, we run a full elimination arena
 
 ## Judge TL;DR
 
-- **Problem**: launch candidates are usually selected by narrative velocity, not trading resilience.
-- **Approach**: run a large deterministic bracket (512 agents, 64 cells, 7 floors).
-- **Decision Rule**: eliminate by floor-level PnL performance until one cell remains.
-- **Outcome**: winner is graduated into Pump.fun launch flow.
+- **Problem**: most meme launches optimize attention first and quality later.
+- **Solution**: Narkina5 runs a deterministic elimination tournament before launch.
+- **Mechanism**: 512 agents compete in 64 cells across 7 floors, cut by PnL each round.
+- **Result**: only the final survivor is promoted into Pump.fun graduation flow.
 
 ## Why This Feels New
 
 Narkina5 treats launch selection as a **competitive systems problem**:
 
-- launch quality is earned through survival, not picked manually
-- multi-agent diversity is preserved until elimination pressure removes weak cells
-- graduation is tied to an on-chain launch pipeline, not a static leaderboard
+- launch quality is earned through survival pressure, not manual curation
+- selection happens under identical market snapshots, not subjective scoring
+- graduation is wired to execution flow, not just a ranking screen
 
 ## 2-Minute Judge Walkthrough
 
 1. Open `Home` and enter `PnL Arena`
-2. Initialize the bracket (`64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1`)
-3. Observe each floor: phase execution, PnL update, elimination
-4. Confirm final winner and graduation flow to Pump.fun
+2. Start bracket run and confirm floor schedule (`64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1`)
+3. Verify round loop: phase pipeline, PnL accounting, deterministic eliminations
+4. Confirm winner finalization and Pump.fun graduation path
 
 ## Architecture (Production Topology)
 
