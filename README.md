@@ -34,38 +34,54 @@ Narkina5 treats launch selection as a **competitive systems problem**:
 3. Observe each floor: phase execution, PnL update, elimination
 4. Confirm final winner and graduation flow to Pump.fun
 
-## Architecture
+## Architecture (Production Topology)
 
 ```text
-User + Wallet (Privy)
-        |
-        v
-React App (Home / PnLArena / About)
-        |
-        v
-Arena Engine (state machine, floors, eliminations)
-   |                 |                    |
-   v                 v                    v
-Market Service     AI Service         Launch Service
-(DexScreener)      (Claude)           (Pump.fun / PumpPortal)
-        \            |                /
-         \           |               /
-          -------- Solana Mainnet --------
+┌──────────────────────────── Client Layer ────────────────────────────┐
+│ React App (Home / PnLArena / About)                                   │
+│ - competition controls and floor progression UI                        │
+│ - wallet session and signing context (Privy)                           │
+└───────────────────────────────┬───────────────────────────────────────┘
+                                │ HTTPS
+                                v
+┌────────────────────────── API Boundary Layer ─────────────────────────┐
+│ Vercel Functions                                                       │
+│ - /api/market      (DexScreener proxy, response shaping)              │
+│ - /api/agent       (Claude role decision endpoint)                     │
+│ - /api/pnl-agent   (PnL-focused decision endpoint)                     │
+│ - /api/pumpfun     (PumpPortal/Pump.fun launch proxy)                 │
+└───────────────┬──────────────────────┬──────────────────────┬─────────┘
+                │                      │                      │
+                v                      v                      v
+           DexScreener API         Anthropic API       PumpPortal/Pump.fun
+
+┌────────────────────────── Arena Core Layer ───────────────────────────┐
+│ pnl-types.ts        domain contracts (Cell, Agent, Portfolio, Trade)  │
+│ pnl-competition.ts  floor state machine + elimination engine           │
+│ pnl-market.ts       market normalization + fallback path               │
+│ transactions.ts     Solana transaction builders                        │
+│ pumpfun.ts          winner graduation and launch orchestration         │
+└───────────────────────────────┬────────────────────────────────────────┘
+                                │ signed tx + RPC calls
+                                v
+                      Solana Mainnet + AgenC Program
 ```
 
-### Subsystems
+### Runtime Contracts
 
-- **Orchestration Layer**
-  - floor progression
-  - elimination scheduling
-  - winner finalization
-- **Decision Layer**
-  - role-based cell decisions
-  - spotlight AI calls with deterministic fallback
-- **Execution Layer**
-  - portfolio updates
-  - transaction builders
-  - graduation launch integration
+| Contract | Responsibility | Source |
+|---|---|---|
+| `PnLCompetitionState` | full arena state, floor cursor, winner, logs | `narkina5-frontend/src/services/pnl-types.ts` |
+| `TradingCell` | per-cell lifecycle, phase, portfolio, elimination status | `narkina5-frontend/src/services/pnl-types.ts` |
+| `Portfolio` + `Trade` | value accounting, position exposure, trade history | `narkina5-frontend/src/services/pnl-types.ts` |
+| `PnLLogEntry` | round-by-round audit trail and replay visibility | `narkina5-frontend/src/services/pnl-types.ts` |
+
+### Reliability and Control Strategy
+
+- Market feed disruption falls back to normalized local path in `pnl-market.ts`.
+- AI cost is bounded by spotlight-cell policy; non-spotlight cells use deterministic decisions.
+- Graduation is gated by floor-7 completion and winner finalization in `pnl-competition.ts`.
+- Transaction building and signing are isolated in `transactions.ts` and Solana wallet context.
 
 ## Arena Engine Design
 
