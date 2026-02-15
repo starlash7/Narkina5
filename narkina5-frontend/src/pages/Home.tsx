@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CopyIcon, CheckIcon } from '../components/Icons';
+import narkinaAgentBg from '../assets/narkina5-agent-bg.png';
 
 export function Home() {
     const [copied, setCopied] = useState(false);
@@ -66,6 +67,26 @@ export function Home() {
                 width: '40rem',
                 height: '40rem',
                 background: 'radial-gradient(circle, rgba(255, 107, 53, 0.12) 0%, transparent 70%)',
+                pointerEvents: 'none',
+            }} />
+            <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `linear-gradient(112deg, rgba(10,10,10,0.9) 0%, rgba(10,10,10,0.72) 46%, rgba(10,10,10,0.9) 100%), url(${narkinaAgentBg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: '72% center',
+                opacity: 0.52,
+                filter: 'saturate(1.18) contrast(1.08)',
+                pointerEvents: 'none',
+            }} />
+            <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: `
+                    radial-gradient(circle at 78% 22%, rgba(110, 213, 255, 0.24) 0%, transparent 40%),
+                    radial-gradient(circle at 20% 72%, rgba(255, 107, 53, 0.16) 0%, transparent 36%)
+                `,
+                mixBlendMode: 'screen',
                 pointerEvents: 'none',
             }} />
 
@@ -402,49 +423,6 @@ export function Home() {
                     </div>
                 </div>
 
-                {/* Bottom CTA */}
-                <div style={{
-                    textAlign: 'center',
-                    padding: '3rem 2rem',
-                    borderRadius: '1rem',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    background: 'rgba(26, 26, 26, 0.3)',
-                }}>
-                    <p style={{
-                        fontSize: '1.5rem',
-                        fontWeight: 300,
-                        color: '#e5e5e5',
-                        margin: '0 0 0.5rem 0',
-                        letterSpacing: '0.05em',
-                    }}>
-                        Compete on PnL. <span style={{ color: '#ff6b35' }}>Graduate to Pump.fun.</span>
-                    </p>
-                    <p style={{
-                        fontSize: '0.9rem',
-                        color: '#6b7280',
-                        margin: '0 0 2rem 0',
-                    }}>
-                        The arena is live. Your cells are waiting.
-                    </p>
-                    <Link to="/pnl-arena" style={{ textDecoration: 'none' }}>
-                        <button style={{
-                            fontFamily: 'inherit',
-                            fontSize: '1rem',
-                            fontWeight: 500,
-                            color: '#0a0a0a',
-                            background: 'linear-gradient(135deg, #ff6b35, #ff8555)',
-                            border: 'none',
-                            padding: '1rem 3rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 0 30px rgba(255, 107, 53, 0.3)',
-                            transition: 'all 0.2s ease',
-                            letterSpacing: '0.05em',
-                        }}>
-                            Open PnL Arena
-                        </button>
-                    </Link>
-                </div>
             </main>
         </div>
     );
