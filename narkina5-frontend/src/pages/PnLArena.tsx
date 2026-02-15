@@ -26,6 +26,9 @@ import {
     FLOOR_BRACKET,
     ELIMINATION_SCHEDULE,
     MAX_POSITION_PERCENT,
+    SEASON_DURATION_DAYS,
+    MAX_GRADUATIONS_PER_SEASON,
+    RELAX_GATE_AFTER_SEASONS,
 } from '../services/pnl-types';
 import type {
     PnLCompetitionState,
@@ -52,13 +55,14 @@ type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' |
 type PnLArenaMode = 'overview' | 'live';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 const CELLS_PER_PAGE = 8;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const SEASON_MS = SEASON_DURATION_DAYS * 24 * 60 * 60 * 1000;
+const WEEK_MS = SEASON_MS;
 const GRAD_MIN_PNL_SOL = 10;
 const GRAD_RELAXED_MIN_PNL_SOL = 8;
 const GRAD_MAX_DRAWDOWN_PERCENT = 15;
 const GRAD_MIN_CONSISTENCY_PERCENT = 55;
-const GRAD_MAX_WEEKLY = 1;
-const GRAD_RELAX_AFTER_WEEKS = 4;
+const GRAD_MAX_WEEKLY = MAX_GRADUATIONS_PER_SEASON;
+const GRAD_RELAX_AFTER_WEEKS = RELAX_GATE_AFTER_SEASONS;
 
 interface GraduationGateResult {
     eligible: boolean;

@@ -294,6 +294,10 @@ export const SLIPPAGE_PERCENT = 0.0015;
 
 export const TOTAL_FLOORS = 7;
 export const TOTAL_ROUNDS = TOTAL_FLOORS;
+export const SEASON_DURATION_DAYS = 7;
+export const ROUNDS_PER_SEASON = TOTAL_ROUNDS;
+export const MAX_GRADUATIONS_PER_SEASON = 1;
+export const RELAX_GATE_AFTER_SEASONS = 4;
 
 export const CELLS_COUNT = 64;
 export const AGENTS_PER_CELL = 8;

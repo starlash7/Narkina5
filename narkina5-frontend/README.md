@@ -1,6 +1,6 @@
 # NARKINA 5 Frontend
 
-> **PnL Elimination Arena UI**  
+> **PnL Season Arena UI**  
 > 64 Cells · 512 Agents · 7 Floors · 1 Survivor
 
 This package contains the web app for Narkina5.
@@ -15,7 +15,7 @@ It presents the full arena flow from cell seeding to Pump.fun graduation.
 ## Core UI Flows
 
 1. Enter the arena and initialize the 64-cell bracket
-2. Track floor-by-floor eliminations and PnL progression
+2. Track season floor progression, eliminations, and PnL
 3. Finalize the winner and execute Pump.fun graduation flow
 
 ## Architecture
@@ -27,8 +27,8 @@ src/
     PnLArena.tsx           # Competition runtime UI (floors, cells, winner)
     About.tsx              # Product and architecture narrative
   services/
-    pnl-types.ts           # Shared domain types/constants
-    pnl-competition.ts     # State machine: round progression + elimination
+    pnl-types.ts           # Shared domain types/constants + season policy
+    pnl-competition.ts     # State machine: season progression + elimination
     pnl-market.ts          # Market ingestion + normalization + fallback
     agent.ts               # AI decision client per role
     pumpfun.ts             # Launch integration service
@@ -50,7 +50,7 @@ api/
 ## Runtime Flow
 
 1. UI initializes competition state (`PnLCompetitionState`)
-2. Engine seeds 64 cells and maps 512 agents
+2. Engine seeds 64 cells and maps 512 agents for a 7-floor season
 3. Market service provides token snapshot for the floor
 4. Each cell runs phase pipeline:
    - research
@@ -58,16 +58,32 @@ api/
    - strategy
    - execution
    - risk review
-5. PnL is recalculated and elimination is applied
+5. PnL is recalculated and elimination is applied by floor schedule
 6. Surviving cells advance to the next floor
 7. Final winner triggers launch flow to Pump.fun
 
 ## State and Domain Contracts
 
 - `TradingCell`: cell identity, agents, phase, portfolio, elimination state
-- `PnLAgent`: role identity and contribution metadata
+- `PnLAgent`: role identity, doctrine, skill profile, learning state
 - `Portfolio`: cash, positions, realized/unrealized PnL, drawdown
 - `Trade`: side, size, price, slippage, role reasoning
+
+## Agent Roles and Traits (Latest)
+
+- `Researcher`: X-query style discovery + narrative catalyst filtering
+- `Analyst`: Wyckoff/technical regime interpretation
+- `Strategist`: cross-role synthesis and capital allocation planning
+- `Trader`: edge vs execution-cost constrained trade actions
+- `RiskManager`: veto logic for toxic symbols and weak liquidity
+
+Doctrines used across cells:
+
+- `Wyckoff`
+- `Scalping`
+- `Technical`
+- `MacroResearch`
+- `OrderFlow`
 
 These contracts keep UI rendering, simulation logic, and API interaction aligned.
 
@@ -104,3 +120,4 @@ Default URL: `http://localhost:5173`
 - Arena simulation is deterministic by design for reproducible elimination results
 - Market data uses DexScreener with fallback behavior for resilience
 - Winner graduation is wired for Pump.fun launch flow
+- Graduation gate and season throughput cap are enforced before launch

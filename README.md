@@ -15,8 +15,8 @@ Instead of launching first and evaluating later, we run a full elimination arena
 ## Judge TL;DR
 
 - **Problem**: most meme launches optimize attention first and quality later.
-- **Solution**: Narkina5 runs a deterministic elimination tournament before launch.
-- **Mechanism**: 512 agents compete in 64 cells across 7 floors, cut by PnL each round.
+- **Solution**: Narkina5 runs a deterministic season tournament before launch.
+- **Mechanism**: 512 agents compete in 64 cells across a 7-floor season, cut by PnL each round.
 - **Result**: only the final survivor is promoted into Pump.fun graduation flow.
 
 ## Why This Feels New
@@ -31,7 +31,7 @@ Narkina5 treats launch selection as a **competitive systems problem**:
 
 1. Open `Home` and enter `PnL Arena`
 2. Start bracket run and confirm floor schedule (`64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1`)
-3. Verify round loop: phase pipeline, PnL accounting, deterministic eliminations
+3. Verify season loop: phase pipeline, PnL accounting, deterministic eliminations
 4. Confirm winner finalization and Pump.fun graduation path
 
 ## Architecture (Production Topology)
@@ -97,11 +97,61 @@ Floor 6:  2 cells x 8 agents = 16   -> top 1 survives
 Floor 7:  1 cell  x 8 agents = 8    -> 1 winner graduates
 ```
 
+### Season Structure
+
+- One season = `7 floors / 7 rounds` with fixed elimination schedule
+- Operational cadence target: `1 floor per day` for a weekly championship
+- End of season: one champion cell enters graduation gate
+- Graduation throughput is capped to protect launch quality and protocol reputation
+
 ### Cell Phase Pipeline
 
 `research -> analysis -> strategy -> execution -> risk_review`
 
 Each phase updates the same typed state contracts and feeds the floor-level ranking pass.
+
+### AI Agent Operating Model (Latest)
+
+Each cell has 8 agents mapped into five roles:
+
+- `Researcher`: narrative discovery, X query templates, catalyst detection
+- `Analyst`: Wyckoff/technical regime checks, trend validation
+- `Strategist`: thesis weighting, allocation planning, scenario orchestration
+- `Trader`: execution timing, slippage/impact-aware order decisions
+- `RiskManager`: concentration/suspicion filters and trade veto authority
+
+Agent doctrine diversity is built-in:
+
+- `Wyckoff`
+- `Scalping`
+- `Technical`
+- `MacroResearch`
+- `OrderFlow`
+
+Every agent carries a skill vector (`riskAppetite`, `execution`, `researchDepth`, `chartSkill`, `adaptation`, `edgeScore`) and updates it each round through a learning loop.
+
+### Execution + Risk Hardening (Latest)
+
+- Slippage baseline reduced to `0.15%`
+- Minimum hold window introduced (`2 rounds`) to reduce churn
+- Buy decisions require `expected edge (bps) > execution costs (slippage + impact + congestion fee proxy)`
+- RiskManager can veto toxic buys using:
+  - suspicion scoring (momentum spikes + weak turnover + ultra-new pair bias)
+  - holder concentration proxy
+  - liquidity/turnover quality thresholds
+- Skill profiles and confidence adapt every round based on realized cell delta
+
+### Graduation Gate Policy
+
+Champion cells do not auto-launch. They pass all gates:
+
+- PnL: `>= +10 SOL` (relaxed to `>= +8 SOL` after long dry streak)
+- Drawdown: `<= 15%`
+- Consistency: `>= 55%`
+- Risk violations: `0`
+- Throughput cap: max `1 graduation per season window`
+
+If any gate fails, champion metadata is retained but launch is blocked.
 
 ### Determinism + Cost Control
 
@@ -160,6 +210,14 @@ narkina5-frontend/
 | Market Data | DexScreener API |
 | Launch | Pump.fun + PumpPortal |
 | Deployment | Vercel |
+
+## Test Coverage
+
+- Engine baseline tests are included with `vitest`:
+  - `64 cells / 512 agents` generation invariant
+  - healthy-market decision generation
+  - toxic-buy veto path
+  - valid-buy execution path
 
 ## Local Setup
 
