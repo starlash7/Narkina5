@@ -7,9 +7,10 @@ export function Footer() {
 
     const footerLinks = [
         {
-            title: 'Product',
+            title: 'Arena',
             links: [
                 { label: 'PnL Arena', to: '/pnl-arena' },
+                { label: 'Arena Live', to: '/pnl-arena/live' },
                 { label: 'About', to: '/about' },
             ],
         },
@@ -78,7 +79,7 @@ export function Footer() {
                             lineHeight: 1.6,
                             margin: 0,
                         }}>
-                            AI Agent Training Factory on Solana.
+                            Cell-based PnL elimination arena on Solana.
                         </p>
                     </div>
 
