@@ -44,9 +44,87 @@ const CELL_ROLE_PATTERN: InvestmentRole[] = [
 
 const MIN_HOLD_ROUNDS = 2;
 const DOCTRINES: TradingDoctrine[] = ['Wyckoff', 'Scalping', 'Technical', 'MacroResearch', 'OrderFlow'];
+const BASE_PRIORITY_FEE_BPS = 4;
+const MAX_PRIORITY_FEE_BPS = 26;
+const MIN_NET_EDGE_BUFFER_BPS = 12;
+const BASE_SLIPPAGE_BPS = SLIPPAGE_PERCENT * 10000;
+const MIN_TURNOVER_RATIO = 0.03;
 
 function clamp(v: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, v));
+}
+
+function turnoverRatio(token: PumpToken): number {
+    return token.volume24h / Math.max(token.marketCapSOL, 1);
+}
+
+function holderConcentrationRisk(token: PumpToken): number {
+    if (token.holders > 0) {
+        return clamp((220 - token.holders) / 220, 0, 1);
+    }
+    const turnover = turnoverRatio(token);
+    return clamp((0.11 - turnover) / 0.11, 0, 1);
+}
+
+function suspicionRisk(token: PumpToken): number {
+    const momentum = Math.abs(token.priceChange24h);
+    const turnover = turnoverRatio(token);
+    const ageHours = Math.max(0.5, (Date.now() - token.createdAt) / 3600000);
+    const spike = clamp((momentum - 22) / 140, 0, 1);
+    const thin = clamp((0.07 - turnover) / 0.07, 0, 1);
+    const ultraNew = clamp((12 - ageHours) / 12, 0, 1);
+    return clamp(spike * 0.45 + thin * 0.35 + ultraNew * 0.2, 0, 1);
+}
+
+function qualityPenalty(token: PumpToken): number {
+    const concentration = holderConcentrationRisk(token);
+    const suspicion = suspicionRisk(token);
+    const turnover = turnoverRatio(token);
+    const lowTurnover = clamp((MIN_TURNOVER_RATIO - turnover) / MIN_TURNOVER_RATIO, 0, 1);
+    return clamp(suspicion * 0.5 + concentration * 0.3 + lowTurnover * 0.2, 0, 1);
+}
+
+function estimatePriceImpactBps(token: PumpToken, amountSOL: number): number {
+    const depthProxy = Math.max(5, token.volume24h * 0.03);
+    const impact = (amountSOL / depthProxy) * 10000;
+    return clamp(impact, 3, 140);
+}
+
+function priorityFeeProxyBps(round: number, cellIndex: number): number {
+    const noise = seededRandom(round * 193 + cellIndex * 71 + 17);
+    return clamp(BASE_PRIORITY_FEE_BPS + noise * (MAX_PRIORITY_FEE_BPS - BASE_PRIORITY_FEE_BPS), BASE_PRIORITY_FEE_BPS, MAX_PRIORITY_FEE_BPS);
+}
+
+function expectedEdgeBps(
+    token: PumpToken,
+    signalScore: number,
+    avgResearch: number,
+    avgChart: number,
+    avgAdapt: number,
+): number {
+    const momentum = token.priceChange24h / 100;
+    const turnover = turnoverRatio(token);
+    const signalComponent = signalScore * 9.5;
+    const regimeComponent = momentum * 125 + (turnover - 0.05) * 180;
+    const skillComponent = (avgResearch * 0.38 + avgChart * 0.42 + avgAdapt * 0.2) * 75;
+    return clamp(signalComponent + regimeComponent + skillComponent, -240, 420);
+}
+
+function roleContribution(role: InvestmentRole): string {
+    switch (role) {
+        case 'Researcher':
+            return 'Narrative scan + social catalyst discovery';
+        case 'Analyst':
+            return 'Wyckoff structure + regime validation';
+        case 'Strategist':
+            return 'Capital allocation + scenario orchestration';
+        case 'Trader':
+            return 'Execution routing + edge-cost filtering';
+        case 'RiskManager':
+            return 'Manipulation filter + drawdown defense';
+        default:
+            return 'General trading support';
+    }
 }
 
 function doctrineScore(token: PumpToken, doctrine: TradingDoctrine): number {
@@ -331,7 +409,7 @@ export function generatePnLAgents(): { agents: Record<string, PnLAgent>; cells: 
                 ...base,
                 investmentRole: role,
                 cellId,
-                contribution: '',
+                contribution: roleContribution(role),
                 skillProfile: makeSkillProfile(cellIdx, slot, role),
                 learning: {
                     rounds: 0,
@@ -411,7 +489,10 @@ export function simulateCellTrades(
     const avgRisk = cellAgents.reduce((s, a) => s + a.skillProfile.riskAppetite, 0) / totalWeight;
     const avgExecution = cellAgents.reduce((s, a) => s + a.skillProfile.execution, 0) / totalWeight;
     const avgResearch = cellAgents.reduce((s, a) => s + a.skillProfile.researchDepth, 0) / totalWeight;
+    const avgChart = cellAgents.reduce((s, a) => s + a.skillProfile.chartSkill, 0) / totalWeight;
+    const avgAdapt = cellAgents.reduce((s, a) => s + a.skillProfile.adaptation, 0) / totalWeight;
     const avgConfidence = cellAgents.reduce((s, a) => s + a.learning.confidence, 0) / totalWeight;
+    const congestionBps = priorityFeeProxyBps(round, cell.cellIndex);
 
     const scoredTokens = tokens
         .map((token) => {
@@ -425,29 +506,37 @@ export function simulateCellTrades(
         })
         .sort((a, b) => b.score - a.score);
 
-    const tradableTokens = scoredTokens.slice(0, 14).map((x) => x.token);
+    const tradableTokens = scoredTokens.slice(0, 14);
     const buyCount = avgExecution > 0.7 ? 2 : 1;
     const used = new Set<string>();
 
     for (let i = 0; i < buyCount && i < tradableTokens.length; i++) {
         const tokenIdx = Math.floor(seededRandom(seed + i * 13 + 7) * Math.min(6, tradableTokens.length));
-        const token = tradableTokens[tokenIdx];
+        const candidate = tradableTokens[tokenIdx];
+        const token = candidate.token;
         if (used.has(token.mint)) continue;
         used.add(token.mint);
+        const qPenalty = qualityPenalty(token);
+        if (qPenalty > 0.83) continue;
+
         const spendPercent = clamp(
             0.025 + avgRisk * 0.06 + avgConfidence * 0.02 + seededRandom(seed + i * 17 + 3) * 0.025,
             0.02,
             0.11,
         );
         const spendSOL = cell.portfolio.cashSOL * spendPercent;
+        const expectedBps = expectedEdgeBps(token, candidate.score, avgResearch, avgChart, avgAdapt) - qPenalty * 120;
+        const impactBps = estimatePriceImpactBps(token, spendSOL);
+        const congestionAdjBps = congestionBps * clamp(1.06 - avgExecution * 0.12, 0.78, 1.08);
+        const totalCostBps = BASE_SLIPPAGE_BPS + impactBps + congestionAdjBps;
 
-        if (spendSOL > 0.1) {
+        if (spendSOL > 0.1 && expectedBps > totalCostBps + MIN_NET_EDGE_BUFFER_BPS) {
             decisions.push({
                 side: 'buy',
                 mint: token.mint,
                 symbol: token.symbol,
                 amountSOL: spendSOL,
-                reasoning: `Composite signal buy (${token.symbol}) from ${cell.name}: doctrine blend + chart/research confidence`,
+                reasoning: `Composite buy ${token.symbol}: edge ${expectedBps.toFixed(1)}bps vs cost ${totalCostBps.toFixed(1)}bps`,
             });
         }
     }
@@ -456,7 +545,7 @@ export function simulateCellTrades(
     const sellablePositions = cell.portfolio.positions.filter(
         (pos) => round - (pos.entryRound ?? round) >= MIN_HOLD_ROUNDS,
     );
-    const holdBias = clamp(0.82 - avgRisk * 0.2 - avgConfidence * 0.1 + avgResearch * 0.08, 0.55, 0.9);
+    const holdBias = clamp(0.84 - avgRisk * 0.2 - avgConfidence * 0.12 + avgResearch * 0.08 + avgAdapt * 0.04, 0.56, 0.9);
     if (sellablePositions.length > 0 && seededRandom(seed + 99) > holdBias) {
         const posIdx = Math.floor(seededRandom(seed + 101) * sellablePositions.length);
         const pos = sellablePositions[posIdx];
@@ -488,6 +577,15 @@ export function applyTrades(
     const prevPnL = cell.portfolio.totalPnL;
     const allTrades: Trade[] = [];
     const logs: PnLLogEntry[] = [];
+    const riskManagers = cell.agents
+        .map((id) => agents[id])
+        .filter((agent): agent is PnLAgent => !!agent && agent.investmentRole === 'RiskManager');
+    const riskStrictness = riskManagers.length > 0
+        ? riskManagers.reduce(
+            (s, agent) => s + ((1 - agent.skillProfile.riskAppetite) * 0.6 + agent.skillProfile.researchDepth * 0.4),
+            0,
+        ) / riskManagers.length
+        : 0.5;
 
     // Pick a trader agent from the cell for attribution
     const traderAgent = cell.agents
@@ -499,6 +597,19 @@ export function applyTrades(
     for (const decision of decisions) {
         const token = tokenMap.get(decision.mint);
         if (!token) continue;
+        const qPenalty = qualityPenalty(token);
+        const turnover = turnoverRatio(token);
+        const riskCutoff = clamp(0.87 - riskStrictness * 0.1, 0.75, 0.9);
+        if (decision.side === 'buy' && (qPenalty > riskCutoff || turnover < MIN_TURNOVER_RATIO * 0.9)) {
+            logs.push({
+                timestamp: Date.now(),
+                round: 0,
+                cellId: cell.id,
+                type: 'risk_alert',
+                message: `${cell.name} risk veto on $${decision.symbol} (quality ${(qPenalty * 100).toFixed(0)}%, turnover ${(turnover * 100).toFixed(1)}%)`,
+            });
+            continue;
+        }
 
         if (decision.side === 'buy') {
             const result = executeBuy(portfolio, token, decision.amountSOL, agentId, agentRole, decision.reasoning, round);

@@ -23,6 +23,53 @@ export type TradingDoctrine =
   | 'MacroResearch'
   | 'OrderFlow';
 
+export interface RoleCompetencyProfile {
+  focus: string[];
+  methods: string[];
+  dataSources: string[];
+  riskControls: string[];
+}
+
+export const ROLE_COMPETENCY_MATRIX: Record<InvestmentRole, RoleCompetencyProfile> = {
+  Researcher: {
+    focus: ['narrative discovery', 'new listing context', 'flow triggers'],
+    methods: ['X operator queries', 'news clustering', 'on-chain event tagging'],
+    dataSources: ['X search', 'DexScreener boosts', 'token age and turnover'],
+    riskControls: ['spam source filter', 'duplicate narrative pruning'],
+  },
+  Analyst: {
+    focus: ['market structure', 'trend regime', 'entry timing'],
+    methods: ['Wyckoff phase scan', 'VWAP drift check', 'RSI and volatility regime'],
+    dataSources: ['price change', '24h volume', 'market cap turnover'],
+    riskControls: ['avoid thin liquidity breakouts', 'reject unstable structure'],
+  },
+  Strategist: {
+    focus: ['capital allocation', 'cell-level positioning', 'rotation'],
+    methods: ['thesis weighting', 'confidence scoring', 'cross-role synthesis'],
+    dataSources: ['research confidence', 'analyst score', 'portfolio exposure'],
+    riskControls: ['position caps', 'scenario branch limits'],
+  },
+  Trader: {
+    focus: ['execution quality', 'fill efficiency', 'timing precision'],
+    methods: ['price impact budgeting', 'slippage guardrails', 'minimum hold windows'],
+    dataSources: ['expected edge', 'execution cost bps', 'priority-fee proxy'],
+    riskControls: ['skip negative edge trades', 'throttle overtrading'],
+  },
+  RiskManager: {
+    focus: ['tail-risk prevention', 'manipulation defense', 'portfolio survival'],
+    methods: ['holder concentration checks', 'suspicion scoring', 'drawdown governance'],
+    dataSources: ['holders', 'turnover ratio', 'momentum spike flags'],
+    riskControls: ['veto toxic buys', 'enforce consistency gates'],
+  },
+};
+
+export const RESEARCH_QUERY_TEMPLATES: string[] = [
+  '$TOKEN lang:en -is:retweet has:cashtags',
+  '$TOKEN (#solana OR #memecoin) -is:retweet',
+  '$TOKEN (announce OR listing OR partnership) lang:en',
+  'from:project_handle $TOKEN -is:retweet',
+];
+
 export const ROLE_FROM_SPEC: Record<Specialization, InvestmentRole> = {
   Holocron: 'Researcher',
   Hyperspace: 'Trader',
