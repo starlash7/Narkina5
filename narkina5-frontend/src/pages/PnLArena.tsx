@@ -55,8 +55,8 @@ const CELLS_PER_PAGE = 8;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const GRAD_MIN_PNL_SOL = 10;
 const GRAD_RELAXED_MIN_PNL_SOL = 8;
-const GRAD_MAX_DRAWDOWN_PERCENT = 20;
-const GRAD_MIN_CONSISTENCY_PERCENT = 60;
+const GRAD_MAX_DRAWDOWN_PERCENT = 15;
+const GRAD_MIN_CONSISTENCY_PERCENT = 55;
 const GRAD_MAX_WEEKLY = 1;
 const GRAD_RELAX_AFTER_WEEKS = 4;
 
@@ -225,7 +225,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
             }
 
             // Apply trades
-            const result = applyTrades(cell, decisions, state.availableTokens, state.agents);
+            const result = applyTrades(cell, decisions, state.availableTokens, state.agents, round);
             state.cells[i] = { ...result.cell, status: 'complete' };
 
             // Update portfolio with current prices after trades

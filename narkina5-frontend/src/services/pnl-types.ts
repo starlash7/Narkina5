@@ -16,6 +16,13 @@ export type InvestmentRole =
   | 'Analyst'      // Holonet   — network / information
   | 'Strategist';  // Kyber     — energy / power
 
+export type TradingDoctrine =
+  | 'Wyckoff'
+  | 'Scalping'
+  | 'Technical'
+  | 'MacroResearch'
+  | 'OrderFlow';
+
 export const ROLE_FROM_SPEC: Record<Specialization, InvestmentRole> = {
   Holocron: 'Researcher',
   Hyperspace: 'Trader',
@@ -73,6 +80,7 @@ export interface Position {
   tokenMint: string;
   tokenSymbol: string;
   tokenName: string;
+  entryRound?: number;
   quantity: number;
   avgEntryPrice: number;   // in SOL
   currentPrice: number;    // in SOL
@@ -143,6 +151,21 @@ export interface PnLAgent extends PrisonAgent {
   investmentRole: InvestmentRole;
   cellId: string;
   contribution: string;
+  skillProfile: {
+    doctrine: TradingDoctrine;
+    riskAppetite: number;    // 0..1
+    execution: number;       // 0..1
+    researchDepth: number;   // 0..1
+    chartSkill: number;      // 0..1
+    adaptation: number;      // 0..1
+    edgeScore: number;       // 0.3..1.5
+  };
+  learning: {
+    rounds: number;
+    cumulativePnL: number;
+    recentRoundPnL: number[];
+    confidence: number;      // 0..1
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +243,7 @@ export interface RiskReviewOutput {
 
 export const STARTING_CAPITAL = 100;
 export const MAX_POSITION_PERCENT = 0.2;
-export const SLIPPAGE_PERCENT = 0.01;
+export const SLIPPAGE_PERCENT = 0.0015;
 
 export const TOTAL_FLOORS = 7;
 export const TOTAL_ROUNDS = TOTAL_FLOORS;

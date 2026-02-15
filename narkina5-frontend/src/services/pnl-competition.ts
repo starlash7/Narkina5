@@ -27,6 +27,7 @@ import type {
     TokenSnapshot,
     TradeDecision,
     InvestmentRole,
+    TradingDoctrine,
 } from './pnl-types';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,79 @@ const CELL_ROLE_PATTERN: InvestmentRole[] = [
     'Trader', 'Trader',
     'RiskManager', 'RiskManager',
 ];
+
+const MIN_HOLD_ROUNDS = 2;
+const DOCTRINES: TradingDoctrine[] = ['Wyckoff', 'Scalping', 'Technical', 'MacroResearch', 'OrderFlow'];
+
+function clamp(v: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, v));
+}
+
+function doctrineScore(token: PumpToken, doctrine: TradingDoctrine): number {
+    const momentum = token.priceChange24h;
+    const volume = Math.log10(Math.max(token.volume24h, 1));
+    const cap = Math.log10(Math.max(token.marketCapSOL, 1));
+    const ageHours = Math.max(1, (Date.now() - token.createdAt) / 3600000);
+
+    switch (doctrine) {
+        case 'Wyckoff':
+            return momentum * 0.55 + volume * 0.35 - Math.abs(momentum) * 0.08;
+        case 'Scalping':
+            return Math.abs(momentum) * 0.45 + volume * 0.55;
+        case 'Technical':
+            return momentum * 0.65 + volume * 0.25 - Math.abs(momentum) * 0.05;
+        case 'MacroResearch':
+            return cap * 0.5 + momentum * 0.25 + volume * 0.25;
+        case 'OrderFlow':
+            return volume * 0.7 + momentum * 0.2 - ageHours * 0.0004;
+        default:
+            return momentum * 0.5 + volume * 0.5;
+    }
+}
+
+function roleTuning(role: InvestmentRole): {
+    risk: number;
+    exec: number;
+    research: number;
+    chart: number;
+    adapt: number;
+} {
+    switch (role) {
+        case 'Researcher':
+            return { risk: 0.36, exec: 0.34, research: 0.86, chart: 0.58, adapt: 0.72 };
+        case 'Trader':
+            return { risk: 0.68, exec: 0.86, research: 0.42, chart: 0.74, adapt: 0.62 };
+        case 'RiskManager':
+            return { risk: 0.24, exec: 0.46, research: 0.58, chart: 0.54, adapt: 0.66 };
+        case 'Analyst':
+            return { risk: 0.42, exec: 0.56, research: 0.78, chart: 0.82, adapt: 0.64 };
+        case 'Strategist':
+            return { risk: 0.54, exec: 0.64, research: 0.74, chart: 0.68, adapt: 0.82 };
+        default:
+            return { risk: 0.45, exec: 0.55, research: 0.55, chart: 0.55, adapt: 0.55 };
+    }
+}
+
+function doctrineByCell(cellIdx: number, slot: number): TradingDoctrine {
+    return DOCTRINES[(cellIdx * 3 + slot * 2) % DOCTRINES.length];
+}
+
+function makeSkillProfile(cellIdx: number, slot: number, role: InvestmentRole) {
+    const base = roleTuning(role);
+    const doctrine = doctrineByCell(cellIdx, slot);
+    const jitter = seededRandom((cellIdx + 1) * 97 + (slot + 1) * 31) - 0.5;
+    const cellBias = seededRandom((cellIdx + 1) * 191) - 0.5;
+
+    return {
+        doctrine,
+        riskAppetite: clamp(base.risk + jitter * 0.18 + cellBias * 0.1, 0.12, 0.9),
+        execution: clamp(base.exec + jitter * 0.14, 0.2, 0.96),
+        researchDepth: clamp(base.research + jitter * 0.16, 0.2, 0.98),
+        chartSkill: clamp(base.chart + jitter * 0.16, 0.2, 0.98),
+        adaptation: clamp(base.adapt + jitter * 0.12, 0.2, 0.98),
+        edgeScore: clamp(0.88 + cellBias * 0.16 + jitter * 0.1, 0.45, 1.25),
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Portfolio helpers
@@ -107,6 +181,7 @@ export function executeBuy(
     agentId: string,
     agentRole: InvestmentRole,
     reasoning: string,
+    currentRound: number,
 ): { portfolio: Portfolio; trade: Trade } {
     // Enforce max position size
     const maxSpend = portfolio.totalValue * MAX_POSITION_PERCENT;
@@ -129,11 +204,13 @@ export function executeBuy(
         existing.quantity += quantity;
         existing.avgEntryPrice = totalCost / existing.quantity;
         existing.currentPrice = token.priceSOL;
+        existing.entryRound = Math.min(existing.entryRound ?? currentRound, currentRound);
     } else {
         p.positions.push({
             tokenMint: token.mint,
             tokenSymbol: token.symbol,
             tokenName: token.name,
+            entryRound: currentRound,
             quantity,
             avgEntryPrice: token.priceSOL,
             currentPrice: token.priceSOL,
@@ -158,9 +235,14 @@ export function executeSell(
     agentId: string,
     agentRole: InvestmentRole,
     reasoning: string,
+    currentRound: number,
 ): { portfolio: Portfolio; trade: Trade } {
     const pos = portfolio.positions.find((p) => p.tokenMint === token.mint);
     if (!pos || pos.quantity <= 0) {
+        return { portfolio, trade: makeTrade(token, 'sell', 0, 0, 0, agentId, agentRole, reasoning) };
+    }
+    const heldRounds = currentRound - (pos.entryRound ?? currentRound);
+    if (heldRounds < MIN_HOLD_ROUNDS) {
         return { portfolio, trade: makeTrade(token, 'sell', 0, 0, 0, agentId, agentRole, reasoning) };
     }
 
@@ -250,6 +332,13 @@ export function generatePnLAgents(): { agents: Record<string, PnLAgent>; cells: 
                 investmentRole: role,
                 cellId,
                 contribution: '',
+                skillProfile: makeSkillProfile(cellIdx, slot, role),
+                learning: {
+                    rounds: 0,
+                    cumulativePnL: 0,
+                    recentRoundPnL: [],
+                    confidence: 0.5,
+                },
             };
 
             agents[pnlAgent.id] = pnlAgent;
@@ -309,7 +398,7 @@ export function initializePnLCompetition(): PnLCompetitionState {
  */
 export function simulateCellTrades(
     cell: TradingCell,
-    _agents: Record<string, PnLAgent>,
+    agents: Record<string, PnLAgent>,
     tokens: PumpToken[],
     round: number,
 ): TradeDecision[] {
@@ -317,14 +406,39 @@ export function simulateCellTrades(
 
     const decisions: TradeDecision[] = [];
     const seed = cell.cellIndex * 997 + round * 31;
+    const cellAgents = cell.agents.map((id) => agents[id]).filter((a): a is PnLAgent => !!a);
+    const totalWeight = Math.max(1, cellAgents.length);
+    const avgRisk = cellAgents.reduce((s, a) => s + a.skillProfile.riskAppetite, 0) / totalWeight;
+    const avgExecution = cellAgents.reduce((s, a) => s + a.skillProfile.execution, 0) / totalWeight;
+    const avgResearch = cellAgents.reduce((s, a) => s + a.skillProfile.researchDepth, 0) / totalWeight;
+    const avgConfidence = cellAgents.reduce((s, a) => s + a.learning.confidence, 0) / totalWeight;
 
-    // Simulate: buy 2-3 tokens, maybe sell 1 position
-    const buyCount = 2 + Math.floor(seededRandom(seed) * 2); // 2-3 buys
+    const scoredTokens = tokens
+        .map((token) => {
+            const weighted = cellAgents.reduce((score, agent) => {
+                const doctrineWeighted = doctrineScore(token, agent.skillProfile.doctrine) * agent.skillProfile.edgeScore;
+                const skillBoost = agent.skillProfile.chartSkill * 0.3 + agent.skillProfile.researchDepth * 0.25;
+                return score + doctrineWeighted + skillBoost;
+            }, 0) / totalWeight;
 
-    for (let i = 0; i < buyCount && i < tokens.length; i++) {
-        const tokenIdx = Math.floor(seededRandom(seed + i * 13 + 7) * tokens.length);
-        const token = tokens[tokenIdx];
-        const spendPercent = 0.05 + seededRandom(seed + i * 17 + 3) * 0.15; // 5-20%
+            return { token, score: weighted };
+        })
+        .sort((a, b) => b.score - a.score);
+
+    const tradableTokens = scoredTokens.slice(0, 14).map((x) => x.token);
+    const buyCount = avgExecution > 0.7 ? 2 : 1;
+    const used = new Set<string>();
+
+    for (let i = 0; i < buyCount && i < tradableTokens.length; i++) {
+        const tokenIdx = Math.floor(seededRandom(seed + i * 13 + 7) * Math.min(6, tradableTokens.length));
+        const token = tradableTokens[tokenIdx];
+        if (used.has(token.mint)) continue;
+        used.add(token.mint);
+        const spendPercent = clamp(
+            0.025 + avgRisk * 0.06 + avgConfidence * 0.02 + seededRandom(seed + i * 17 + 3) * 0.025,
+            0.02,
+            0.11,
+        );
         const spendSOL = cell.portfolio.cashSOL * spendPercent;
 
         if (spendSOL > 0.1) {
@@ -333,22 +447,26 @@ export function simulateCellTrades(
                 mint: token.mint,
                 symbol: token.symbol,
                 amountSOL: spendSOL,
-                reasoning: `Simulated buy: ${token.symbol} looks promising`,
+                reasoning: `Composite signal buy (${token.symbol}) from ${cell.name}: doctrine blend + chart/research confidence`,
             });
         }
     }
 
-    // Maybe sell a position
-    if (cell.portfolio.positions.length > 0 && seededRandom(seed + 99) > 0.5) {
-        const posIdx = Math.floor(seededRandom(seed + 101) * cell.portfolio.positions.length);
-        const pos = cell.portfolio.positions[posIdx];
-        const sellPercent = 0.3 + seededRandom(seed + 103) * 0.7; // 30-100%
+    // Maybe sell an eligible position (respect minimum hold)
+    const sellablePositions = cell.portfolio.positions.filter(
+        (pos) => round - (pos.entryRound ?? round) >= MIN_HOLD_ROUNDS,
+    );
+    const holdBias = clamp(0.82 - avgRisk * 0.2 - avgConfidence * 0.1 + avgResearch * 0.08, 0.55, 0.9);
+    if (sellablePositions.length > 0 && seededRandom(seed + 99) > holdBias) {
+        const posIdx = Math.floor(seededRandom(seed + 101) * sellablePositions.length);
+        const pos = sellablePositions[posIdx];
+        const sellPercent = clamp(0.2 + (1 - avgConfidence) * 0.35 + seededRandom(seed + 103) * 0.2, 0.2, 0.7);
         decisions.push({
             side: 'sell',
             mint: pos.tokenMint,
             symbol: pos.tokenSymbol,
             amountSOL: pos.quantity * pos.currentPrice * sellPercent,
-            reasoning: `Simulated sell: taking profits on ${pos.tokenSymbol}`,
+            reasoning: `Risk rebalance sell (${pos.tokenSymbol}): confidence/hold rule triggered`,
         });
     }
 
@@ -363,9 +481,11 @@ export function applyTrades(
     decisions: TradeDecision[],
     tokens: PumpToken[],
     agents: Record<string, PnLAgent>,
+    round: number,
 ): { cell: TradingCell; trades: Trade[]; logs: PnLLogEntry[] } {
     const tokenMap = new Map(tokens.map((t) => [t.mint, t]));
     let portfolio = { ...cell.portfolio };
+    const prevPnL = cell.portfolio.totalPnL;
     const allTrades: Trade[] = [];
     const logs: PnLLogEntry[] = [];
 
@@ -381,7 +501,7 @@ export function applyTrades(
         if (!token) continue;
 
         if (decision.side === 'buy') {
-            const result = executeBuy(portfolio, token, decision.amountSOL, agentId, agentRole, decision.reasoning);
+            const result = executeBuy(portfolio, token, decision.amountSOL, agentId, agentRole, decision.reasoning, round);
             portfolio = result.portfolio;
             if (result.trade.quantity > 0) {
                 allTrades.push(result.trade);
@@ -394,7 +514,7 @@ export function applyTrades(
                 });
             }
         } else {
-            const result = executeSell(portfolio, token, decision.amountSOL, agentId, agentRole, decision.reasoning);
+            const result = executeSell(portfolio, token, decision.amountSOL, agentId, agentRole, decision.reasoning, round);
             portfolio = result.portfolio;
             if (result.trade.quantity > 0) {
                 allTrades.push(result.trade);
@@ -406,6 +526,31 @@ export function applyTrades(
                     message: `${cell.name} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL`,
                 });
             }
+        }
+    }
+
+    const pnlDelta = portfolio.totalPnL - prevPnL;
+    if (cell.agents.length > 0) {
+        const perAgentDelta = pnlDelta / cell.agents.length;
+        for (const id of cell.agents) {
+            const agent = agents[id];
+            if (!agent) continue;
+
+            const recent = [...agent.learning.recentRoundPnL, perAgentDelta].slice(-10);
+            const recentAvg = recent.reduce((s, v) => s + v, 0) / Math.max(1, recent.length);
+            const lr = 0.06 + agent.skillProfile.adaptation * 0.18;
+            const direction = recentAvg >= 0 ? 1 : -1;
+
+            agent.learning.rounds += 1;
+            agent.learning.cumulativePnL += perAgentDelta;
+            agent.learning.recentRoundPnL = recent;
+            agent.learning.confidence = clamp(agent.learning.confidence + direction * lr * 0.08, 0.1, 0.95);
+
+            agent.skillProfile.edgeScore = clamp(agent.skillProfile.edgeScore + direction * lr * 0.05, 0.35, 1.8);
+            agent.skillProfile.riskAppetite = clamp(agent.skillProfile.riskAppetite + direction * lr * 0.03, 0.1, 0.9);
+            agent.skillProfile.execution = clamp(agent.skillProfile.execution + direction * lr * 0.015, 0.2, 0.99);
+            agent.skillProfile.researchDepth = clamp(agent.skillProfile.researchDepth + direction * lr * 0.012, 0.2, 0.99);
+            agent.skillProfile.chartSkill = clamp(agent.skillProfile.chartSkill + direction * lr * 0.012, 0.2, 0.99);
         }
     }
 
