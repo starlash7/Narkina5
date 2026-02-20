@@ -5,7 +5,7 @@ import narkinaAgentBg from '../assets/narkina5-agent-bg.png';
 
 export function Home() {
     const [copied, setCopied] = useState(false);
-    const address = "EaVBaKvaimQs88sNVpjutm2sCxsnyxdR7kQQBxy9Qh24";
+    const address = import.meta.env.VITE_TOKEN_CA || "EaVBaKvaimQs88sNVpjutm2sCxsnyxdR7kQQBxy9Qh24";
 
     const handleCopy = async () => {
         await navigator.clipboard.writeText(address);

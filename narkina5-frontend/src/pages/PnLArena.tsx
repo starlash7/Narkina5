@@ -54,6 +54,8 @@ import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } f
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 type PnLArenaMode = 'overview' | 'live';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
+const SOLANA_CHAIN = 'solana:mainnet';
+const SOLSCAN_TX_BASE = 'https://solscan.io/tx/';
 const CELLS_PER_PAGE = 8;
 const SEASON_MS = SEASON_DURATION_DAYS * 24 * 60 * 60 * 1000;
 const WEEK_MS = SEASON_MS;
@@ -128,7 +130,12 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     // Graduation
     const [gradStatus, setGradStatus] = useState<GradStatus>('idle');
     const [gradError, setGradError] = useState<string | null>(null);
-    const [gradResult, setGradResult] = useState<{ mintAddress: string; pumpfunUrl: string } | null>(null);
+    const [gradResult, setGradResult] = useState<{
+        mintAddress: string;
+        pumpfunUrl: string;
+        signature: string;
+        txExplorerUrl: string;
+    } | null>(null);
 
     const logRef = useRef<HTMLDivElement>(null);
     const autoPlayRef = useRef(autoPlay);
@@ -418,7 +425,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
             const { signedTransaction } = await signTransaction({
                 transaction: mintSigned,
                 wallet,
-                chain: 'solana:devnet',
+                chain: SOLANA_CHAIN,
             });
 
             setGradStatus('confirming');
@@ -427,10 +434,11 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
             await connection.confirmTransaction(sig, 'confirmed');
 
             const pumpfunUrl = getPumpfunUrl(mintPub);
+            const txExplorerUrl = `${SOLSCAN_TX_BASE}${sig}`;
             saveGraduatedAgent({ name: tokenName, symbol: tokenSymbol, specialization: bestAgent.specialization, mintAddress: mintPub, pumpfunUrl, graduatedAt: Date.now(), trustScore: 100 });
 
             setGradStatus('success');
-            setGradResult({ mintAddress: mintPub, pumpfunUrl });
+            setGradResult({ mintAddress: mintPub, pumpfunUrl, signature: sig, txExplorerUrl });
         } catch (err) {
             setGradStatus('error');
             setGradError(err instanceof Error ? err.message : 'Graduation failed');
@@ -931,6 +939,17 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                                 style={{ color: '#ff6b35', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                                 View on Pump.fun <ExternalLinkIcon size="0.85rem" />
                             </a>
+                            <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#9ca3af' }}>
+                                Tx Hash:{' '}
+                                <a
+                                    href={gradResult.txExplorerUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#6ee7ff' }}
+                                >
+                                    {`${gradResult.signature.slice(0, 8)}...${gradResult.signature.slice(-8)}`}
+                                </a>
+                            </div>
                         </div>
                     )}
                     {gradStatus === 'error' && (
