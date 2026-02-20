@@ -230,7 +230,10 @@ Create `.env`:
 
 ```bash
 VITE_PRIVY_APP_ID=your_privy_app_id
-VITE_ANTHROPIC_API_KEY=your_anthropic_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+VITE_TOKEN_CA=your_pump_fun_token_ca
+VITE_PROJECT_X_URL=https://x.com/Narkina5Agent
+VITE_PROJECT_WEBSITE_URL=https://narkina5.vercel.app
 ```
 
 Run:

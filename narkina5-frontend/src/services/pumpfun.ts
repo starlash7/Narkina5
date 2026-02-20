@@ -1,5 +1,8 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 
+const PROJECT_X_URL = import.meta.env.VITE_PROJECT_X_URL || 'https://x.com/Narkina5Agent';
+const PROJECT_WEBSITE_URL = import.meta.env.VITE_PROJECT_WEBSITE_URL || 'https://narkina5.vercel.app';
+
 // ── Types ──────────────────────────────────────────────
 export interface AgentGraduationData {
     name: string;
@@ -85,8 +88,8 @@ export async function uploadMetadata(
             name,
             symbol,
             description,
-            twitter: 'https://x.com/narkina5',
-            website: 'https://narkina5.factory',
+            twitter: PROJECT_X_URL,
+            website: PROJECT_WEBSITE_URL,
             showName: true,
         }),
     });
