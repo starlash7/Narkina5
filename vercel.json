@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "ignoreCommand": "if [ \"$VERCEL_PROJECT_PRODUCTION_URL\" = \"narkina5.vercel.app\" ]; then echo 'Skipping legacy project deployment (narkina5)'; exit 0; fi; exit 1",
   "installCommand": "cd narkina5-frontend && npm install",
   "buildCommand": "cd narkina5-frontend && npm run build",
   "outputDirectory": "narkina5-frontend/dist",
