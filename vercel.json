@@ -4,11 +4,6 @@
   "installCommand": "cd narkina5-frontend && npm install",
   "buildCommand": "cd narkina5-frontend && npm run build",
   "outputDirectory": "narkina5-frontend/dist",
-  "functions": {
-    "api/*.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/:path*",
