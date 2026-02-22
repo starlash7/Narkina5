@@ -15,7 +15,7 @@ import {
     recordTokenSnapshot,
     logEntry,
 } from '../services/pnl-competition';
-import { fetchTrendingTokens, refreshPrices } from '../services/pnl-market';
+import { fetchTrendingTokens, refreshPrices, getMarketFeedHealth } from '../services/pnl-market';
 import {
     ROLE_COLORS,
     ROLE_LABELS,
@@ -65,6 +65,7 @@ const GRAD_MAX_DRAWDOWN_PERCENT = 15;
 const GRAD_MIN_CONSISTENCY_PERCENT = 55;
 const GRAD_MAX_WEEKLY = MAX_GRADUATIONS_PER_SEASON;
 const GRAD_RELAX_AFTER_WEEKS = RELAX_GATE_AFTER_SEASONS;
+const RECEIPT_RULE_VERSION = '2026-02-22';
 
 interface GraduationGateResult {
     eligible: boolean;
@@ -136,6 +137,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
         signature: string;
         txExplorerUrl: string;
     } | null>(null);
+    const [seasonId] = useState(() => Date.now());
 
     const logRef = useRef<HTMLDivElement>(null);
     const autoPlayRef = useRef(autoPlay);
@@ -726,6 +728,8 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     const ranked = [...activeRanked, ...eliminatedCells];
     const winnerCell = comp.winner ? comp.cells.find(d => d.id === comp.winner) : null;
     const winnerGate = winnerCell ? evaluateGraduationGate(winnerCell) : null;
+    const winnerTrustScore = winnerCell && winnerGate ? computeCellTrustScore(winnerCell, winnerGate) : null;
+    const feedHealth = getMarketFeedHealth();
     const currentFloor = getFloorFromRound(comp.currentRound, comp.status === 'complete');
     const eliminationCount = ELIMINATION_SCHEDULE[comp.currentRound] ?? 0;
     const totalCellPages = Math.max(1, Math.ceil(ranked.length / CELLS_PER_PAGE));
@@ -734,6 +738,34 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     const pageEnd = Math.min(pageStart + CELLS_PER_PAGE, ranked.length);
     const pagedCells = ranked.slice(pageStart, pageEnd);
     const leaderboardCells = ranked.slice(0, 20);
+    const handleDownloadSeasonReceipt = () => {
+        if (!winnerCell || !winnerGate) return;
+        const receipt = buildSeasonReceipt({
+            seasonId,
+            competition: comp,
+            winnerCell,
+            gate: winnerGate,
+            gradResult,
+            feedHealth,
+        });
+
+        try {
+            const existing = localStorage.getItem('narkina5_season_receipts');
+            const history = existing ? JSON.parse(existing) as SeasonReceipt[] : [];
+            history.unshift(receipt);
+            localStorage.setItem('narkina5_season_receipts', JSON.stringify(history.slice(0, 20)));
+        } catch {
+            // ignore local storage write errors
+        }
+
+        const blob = new Blob([JSON.stringify(receipt, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `narkina5-season-${seasonId}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <div style={{
@@ -776,6 +808,9 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                                 {eliminationCount} cell(s) will be eliminated after this floor
                             </span>
                         )}
+                        <span style={{ color: feedStatusColor(feedHealth.status), fontSize: '0.7rem' }}>
+                            Feed: {feedHealth.status}{feedHealth.consecutiveErrors > 0 ? ` (${feedHealth.consecutiveErrors} err)` : ''}
+                        </span>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -894,6 +929,52 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             )}
                         </div>
                     )}
+                    {winnerTrustScore !== null && (
+                        <div style={{
+                            margin: '0 auto 0.6rem auto',
+                            maxWidth: 640,
+                            textAlign: 'left',
+                            color: '#9ca3af',
+                            fontSize: '0.75rem',
+                        }}>
+                            Cell Trust Score:{' '}
+                            <span style={{ color: '#6ee7ff', fontWeight: 700 }}>
+                                {winnerTrustScore.toFixed(1)} / 100
+                            </span>
+                        </div>
+                    )}
+                    <div style={{
+                        margin: '0 auto 0.8rem auto',
+                        maxWidth: 640,
+                        textAlign: 'left',
+                        color: '#9ca3af',
+                        fontSize: '0.75rem',
+                    }}>
+                        Feed Health:{' '}
+                        <span style={{ color: feedStatusColor(feedHealth.status), fontWeight: 700 }}>
+                            {feedHealth.status}
+                        </span>
+                        {feedHealth.lastSuccessAt && (
+                            <span style={{ color: '#6b7280' }}>
+                                {' '}· last success {new Date(feedHealth.lastSuccessAt).toLocaleTimeString()}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleDownloadSeasonReceipt}
+                        style={{
+                            background: 'transparent',
+                            color: '#9ca3af',
+                            border: '1px solid #333',
+                            borderRadius: 6,
+                            padding: '0.4rem 0.85rem',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            marginBottom: '0.8rem',
+                        }}
+                    >
+                        Download Season Receipt
+                    </button>
                     {gradStatus === 'idle' && authenticated && winnerGate?.eligible && (
                         <button onClick={() => handleGraduate(winnerCell)} style={{
                             background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6,
@@ -1389,5 +1470,116 @@ function evaluateGraduationGate(cell: TradingCell): GraduationGateResult {
             weeklySlot: weeklySlotCheck,
         },
         reasons,
+    };
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+function computeCellTrustScore(cell: TradingCell, gate: GraduationGateResult): number {
+    const pnlScore = clampNumber(((cell.portfolio.totalPnL + 10) / 20) * 30, 0, 30);
+    const consistencyScore = clampNumber(gate.consistencyPercent, 0, 100) * 0.3;
+    const drawdownRatio = clampNumber(cell.portfolio.maxDrawdown / GRAD_MAX_DRAWDOWN_PERCENT, 0, 1);
+    const drawdownScore = (1 - drawdownRatio) * 20;
+    const riskScore = clampNumber(15 - gate.riskViolations * 7.5, 0, 15);
+    const gateBonus = gate.eligible ? 5 : 0;
+    return clampNumber(pnlScore + consistencyScore + drawdownScore + riskScore + gateBonus, 0, 100);
+}
+
+function feedStatusColor(status: 'WORKING' | 'FLAKY' | 'FAILING'): string {
+    if (status === 'WORKING') return '#22c55e';
+    if (status === 'FLAKY') return '#f59e0b';
+    return '#ef4444';
+}
+
+interface SeasonReceipt {
+    seasonId: number;
+    generatedAt: string;
+    ruleVersion: string;
+    round: number;
+    winner: {
+        id: string;
+        name: string;
+        totalPnlSOL: number;
+        totalPnlPercent: number;
+        drawdownPercent: number;
+        trustScore: number;
+    };
+    gate: {
+        eligible: boolean;
+        minPnlRequired: number;
+        consistencyPercent: number;
+        riskViolations: number;
+        weeklyGraduations: number;
+        reasons: string[];
+        checks: GraduationGateResult['checks'];
+    };
+    graduation: {
+        minted: boolean;
+        mintAddress: string | null;
+        pumpfunUrl: string | null;
+        signature: string | null;
+        txExplorerUrl: string | null;
+    };
+    feedHealth: {
+        status: 'WORKING' | 'FLAKY' | 'FAILING';
+        consecutiveErrors: number;
+        lastSuccessAt: number | null;
+        lastErrorAt: number | null;
+        lastErrorMessage: string | null;
+    };
+}
+
+function buildSeasonReceipt(params: {
+    seasonId: number;
+    competition: PnLCompetitionState;
+    winnerCell: TradingCell;
+    gate: GraduationGateResult;
+    gradResult: {
+        mintAddress: string;
+        pumpfunUrl: string;
+        signature: string;
+        txExplorerUrl: string;
+    } | null;
+    feedHealth: ReturnType<typeof getMarketFeedHealth>;
+}): SeasonReceipt {
+    const { seasonId, competition, winnerCell, gate, gradResult, feedHealth } = params;
+    return {
+        seasonId,
+        generatedAt: new Date().toISOString(),
+        ruleVersion: RECEIPT_RULE_VERSION,
+        round: competition.currentRound,
+        winner: {
+            id: winnerCell.id,
+            name: winnerCell.name,
+            totalPnlSOL: winnerCell.portfolio.totalPnL,
+            totalPnlPercent: winnerCell.portfolio.totalPnLPercent,
+            drawdownPercent: winnerCell.portfolio.maxDrawdown,
+            trustScore: computeCellTrustScore(winnerCell, gate),
+        },
+        gate: {
+            eligible: gate.eligible,
+            minPnlRequired: gate.minPnlRequired,
+            consistencyPercent: gate.consistencyPercent,
+            riskViolations: gate.riskViolations,
+            weeklyGraduations: gate.weeklyGraduations,
+            reasons: gate.reasons,
+            checks: gate.checks,
+        },
+        graduation: {
+            minted: !!gradResult,
+            mintAddress: gradResult?.mintAddress ?? null,
+            pumpfunUrl: gradResult?.pumpfunUrl ?? null,
+            signature: gradResult?.signature ?? null,
+            txExplorerUrl: gradResult?.txExplorerUrl ?? null,
+        },
+        feedHealth: {
+            status: feedHealth.status,
+            consecutiveErrors: feedHealth.consecutiveErrors,
+            lastSuccessAt: feedHealth.lastSuccessAt,
+            lastErrorAt: feedHealth.lastErrorAt,
+            lastErrorMessage: feedHealth.lastErrorMessage,
+        },
     };
 }
