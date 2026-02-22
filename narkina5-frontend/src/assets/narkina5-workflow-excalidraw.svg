@@ -1,0 +1,84 @@
+<svg width="1440" height="860" viewBox="0 0 1440 860" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Narkina5 graduation to pump.fun workflow">
+  <defs>
+    <filter id="paper">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.03"/>
+      </feComponentTransfer>
+    </filter>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11" fill="none" stroke="#1f2937" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .bg { fill: #fffdf7; }
+      .grain { fill: #000; filter: url(#paper); }
+      .box { fill: #fff7e8; stroke: #1f2937; stroke-width: 3; rx: 18; ry: 18; }
+      .box-alt { fill: #edf7ff; stroke: #1f2937; stroke-width: 3; rx: 18; ry: 18; }
+      .box-warn { fill: #ffe8d9; stroke: #b45309; stroke-width: 3; rx: 18; ry: 18; }
+      .txt { fill: #111827; font-family: "Virgil", "Comic Sans MS", cursive; font-size: 24px; font-weight: 700; }
+      .sub { fill: #374151; font-family: "Virgil", "Comic Sans MS", cursive; font-size: 18px; font-weight: 600; }
+      .title { fill: #0f172a; font-family: "Virgil", "Comic Sans MS", cursive; font-size: 38px; font-weight: 700; }
+      .arrow { stroke: #1f2937; stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .arrow-soft { stroke: #4b5563; stroke-width: 2.8; fill: none; stroke-dasharray: 8 8; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1440" height="860"/>
+  <rect class="grain" x="0" y="0" width="1440" height="860"/>
+
+  <text class="title" x="56" y="70">NARKINA5: Graduation -&gt; Pump.fun Launch Workflow</text>
+  <text class="sub" x="56" y="104">Automated pipeline with one explicit wallet signature approval</text>
+
+  <rect class="box" x="70" y="150" width="300" height="120" transform="rotate(-1 220 210)"/>
+  <text class="txt" x="115" y="203">1) Run Season</text>
+  <text class="sub" x="115" y="233">64 cells, 7 floors</text>
+
+  <rect class="box" x="450" y="150" width="300" height="120" transform="rotate(1 600 210)"/>
+  <text class="txt" x="495" y="203">2) Survivor Cell</text>
+  <text class="sub" x="495" y="233">Winner finalized</text>
+
+  <rect class="box" x="830" y="150" width="300" height="120" transform="rotate(-1 980 210)"/>
+  <text class="txt" x="865" y="203">3) Gate Check</text>
+  <text class="sub" x="865" y="233">PnL / DD / consistency / risk</text>
+
+  <rect class="box-alt" x="1210" y="150" width="180" height="120" transform="rotate(1 1300 210)"/>
+  <text class="txt" x="1241" y="204">PASS?</text>
+  <text class="sub" x="1236" y="233">if yes, launch flow</text>
+
+  <path class="arrow" d="M 365 210 C 390 210, 420 210, 445 210"/>
+  <path class="arrow" d="M 745 210 C 770 210, 800 210, 825 210"/>
+  <path class="arrow" d="M 1125 210 C 1152 210, 1180 210, 1205 210"/>
+
+  <rect class="box-alt" x="120" y="360" width="340" height="120" transform="rotate(1 290 420)"/>
+  <text class="txt" x="155" y="412">4) Build Metadata</text>
+  <text class="sub" x="155" y="442">/api/pumpfun?action=ipfs</text>
+
+  <rect class="box-alt" x="550" y="360" width="340" height="120" transform="rotate(-1 720 420)"/>
+  <text class="txt" x="585" y="412">5) Build Create Tx</text>
+  <text class="sub" x="585" y="442">/api/pumpfun?action=trade</text>
+
+  <rect class="box-warn" x="980" y="360" width="360" height="120" transform="rotate(1 1160 420)"/>
+  <text class="txt" x="1015" y="410">6) Wallet Signature</text>
+  <text class="sub" x="1015" y="440">Manual approval (1 click)</text>
+
+  <path class="arrow" d="M 1295 272 C 1220 305, 1130 330, 1035 365"/>
+  <path class="arrow" d="M 455 420 C 485 420, 515 420, 545 420"/>
+  <path class="arrow" d="M 895 420 C 920 420, 950 420, 975 420"/>
+
+  <rect class="box" x="170" y="570" width="420" height="140" transform="rotate(-1 380 640)"/>
+  <text class="txt" x="210" y="624">7) Send On-chain</text>
+  <text class="sub" x="210" y="654">Solana mainnet tx broadcast + confirm</text>
+
+  <rect class="box" x="730" y="570" width="620" height="190" transform="rotate(1 1040 665)"/>
+  <text class="txt" x="775" y="624">8) Launch Artifacts (UI Proof)</text>
+  <text class="sub" x="775" y="654">- Mint address</text>
+  <text class="sub" x="775" y="680">- Pump.fun URL</text>
+  <text class="sub" x="775" y="706">- Tx hash + explorer link</text>
+  <text class="sub" x="775" y="732">- Season receipt JSON</text>
+
+  <path class="arrow" d="M 1130 485 C 1050 540, 960 575, 860 610"/>
+  <path class="arrow" d="M 595 640 C 635 640, 675 640, 725 640"/>
+  <path class="arrow-soft" d="M 380 563 C 365 520, 325 490, 290 480"/>
+  <text class="sub" x="205" y="520">if gate fails -&gt; keep champion metadata, block launch</text>
+</svg>
