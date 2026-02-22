@@ -15,7 +15,13 @@ import {
     recordTokenSnapshot,
     logEntry,
 } from '../services/pnl-competition';
-import { fetchTrendingTokens, refreshPrices, getMarketFeedHealth } from '../services/pnl-market';
+import {
+    fetchTrendingTokens,
+    refreshPrices,
+    getMarketFeedHealth,
+    isMarketFeedReliable,
+} from '../services/pnl-market';
+import type { FeedReliabilityMode, MarketFeedHealth } from '../services/pnl-market';
 import {
     ROLE_COLORS,
     ROLE_LABELS,
@@ -53,6 +59,7 @@ import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } f
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 type PnLArenaMode = 'overview' | 'live';
+type GraduationGateProfile = 'strict' | 'hackathon';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 const SOLANA_CHAIN = 'solana:mainnet';
 const SOLSCAN_TX_BASE = 'https://solscan.io/tx/';
@@ -67,12 +74,46 @@ const GRAD_MAX_WEEKLY = MAX_GRADUATIONS_PER_SEASON;
 const GRAD_RELAX_AFTER_WEEKS = RELAX_GATE_AFTER_SEASONS;
 const RECEIPT_RULE_VERSION = '2026-02-22';
 
+interface GateProfileConfig {
+    minPnlSOL: number;
+    relaxedMinPnlSOL: number;
+    maxDrawdownPercent: number;
+    minConsistencyPercent: number;
+    maxRiskViolations: number;
+    maxWeeklyGraduations: number;
+}
+
+const GATE_PROFILE_CONFIG: Record<GraduationGateProfile, GateProfileConfig> = {
+    strict: {
+        minPnlSOL: GRAD_MIN_PNL_SOL,
+        relaxedMinPnlSOL: GRAD_RELAXED_MIN_PNL_SOL,
+        maxDrawdownPercent: GRAD_MAX_DRAWDOWN_PERCENT,
+        minConsistencyPercent: GRAD_MIN_CONSISTENCY_PERCENT,
+        maxRiskViolations: 0,
+        maxWeeklyGraduations: GRAD_MAX_WEEKLY,
+    },
+    hackathon: {
+        minPnlSOL: 6,
+        relaxedMinPnlSOL: 5,
+        maxDrawdownPercent: 22,
+        minConsistencyPercent: 45,
+        maxRiskViolations: 1,
+        maxWeeklyGraduations: Math.max(2, GRAD_MAX_WEEKLY),
+    },
+};
+
 interface GraduationGateResult {
+    profile: GraduationGateProfile;
+    feedReliabilityMode: FeedReliabilityMode;
     eligible: boolean;
     minPnlRequired: number;
+    maxDrawdownPercent: number;
     consistencyPercent: number;
+    minConsistencyPercent: number;
     riskViolations: number;
+    maxRiskViolations: number;
     weeklyGraduations: number;
+    maxWeeklyGraduations: number;
     weeksSinceLastGraduation: number;
     checks: {
         pnl: boolean;
@@ -80,6 +121,7 @@ interface GraduationGateResult {
         consistency: boolean;
         risk: boolean;
         weeklySlot: boolean;
+        feed: boolean;
     };
     reasons: string[];
 }
@@ -138,6 +180,9 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
         txExplorerUrl: string;
     } | null>(null);
     const [seasonId] = useState(() => Date.now());
+    const [gateProfile, setGateProfile] = useState<GraduationGateProfile>('hackathon');
+    const [feedReliabilityMode, setFeedReliabilityMode] = useState<FeedReliabilityMode>('balanced');
+    const [launchSafetyLocked, setLaunchSafetyLocked] = useState(true);
 
     const logRef = useRef<HTMLDivElement>(null);
     const autoPlayRef = useRef(autoPlay);
@@ -381,7 +426,13 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
             .sort((a, b) => (b.investmentRole === 'Strategist' ? 1 : 0) - (a.investmentRole === 'Strategist' ? 1 : 0))[0];
 
         if (!bestAgent) return;
-        const gate = evaluateGraduationGate(cell);
+        const feedHealth = getMarketFeedHealth();
+        const gate = evaluateGraduationGate(cell, gateProfile, feedHealth, feedReliabilityMode);
+        if (launchSafetyLocked) {
+            setGradStatus('error');
+            setGradError('Launch safety lock is enabled. Unlock it before token launch.');
+            return;
+        }
         if (!gate.eligible) {
             setGradStatus('error');
             setGradError(`Graduation gate not met: ${gate.reasons.join(' | ')}`);
@@ -440,12 +491,13 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
             saveGraduatedAgent({ name: tokenName, symbol: tokenSymbol, specialization: bestAgent.specialization, mintAddress: mintPub, pumpfunUrl, graduatedAt: Date.now(), trustScore: 100 });
 
             setGradStatus('success');
+            setLaunchSafetyLocked(true);
             setGradResult({ mintAddress: mintPub, pumpfunUrl, signature: sig, txExplorerUrl });
         } catch (err) {
             setGradStatus('error');
             setGradError(err instanceof Error ? err.message : 'Graduation failed');
         }
-    }, [authenticated, publicKey, wallets, comp, login, signTransaction]);
+    }, [authenticated, publicKey, wallets, comp, login, signTransaction, gateProfile, feedReliabilityMode, launchSafetyLocked]);
 
     // ── Reset ───────────────────────────────────────────
     const handleReset = useCallback(() => {
@@ -456,6 +508,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
         setCellPage(1);
         setGradStatus('idle');
         setGradResult(null);
+        setLaunchSafetyLocked(true);
         navigate('/pnl-arena');
     }, [navigate]);
 
@@ -727,9 +780,9 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     const eliminatedCells = comp.cells.filter(d => d.status === 'eliminated').sort((a, b) => (b.eliminatedRound ?? 0) - (a.eliminatedRound ?? 0));
     const ranked = [...activeRanked, ...eliminatedCells];
     const winnerCell = comp.winner ? comp.cells.find(d => d.id === comp.winner) : null;
-    const winnerGate = winnerCell ? evaluateGraduationGate(winnerCell) : null;
-    const winnerTrustScore = winnerCell && winnerGate ? computeCellTrustScore(winnerCell, winnerGate) : null;
     const feedHealth = getMarketFeedHealth();
+    const winnerGate = winnerCell ? evaluateGraduationGate(winnerCell, gateProfile, feedHealth, feedReliabilityMode) : null;
+    const winnerTrustScore = winnerCell && winnerGate ? computeCellTrustScore(winnerCell, winnerGate) : null;
     const currentFloor = getFloorFromRound(comp.currentRound, comp.status === 'complete');
     const eliminationCount = ELIMINATION_SCHEDULE[comp.currentRound] ?? 0;
     const totalCellPages = Math.max(1, Math.ceil(ranked.length / CELLS_PER_PAGE));
@@ -747,6 +800,9 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
             gate: winnerGate,
             gradResult,
             feedHealth,
+            gateProfile,
+            feedReliabilityMode,
+            launchSafetyLocked,
         });
 
         try {
@@ -883,6 +939,82 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                 </div>
             )}
 
+            <div style={{
+                ...panelStyle,
+                marginBottom: '1rem',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '0.7rem',
+            }}>
+                <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.68rem', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Gate Profile
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {(['strict', 'hackathon'] as const).map((profile) => (
+                            <button
+                                key={profile}
+                                onClick={() => setGateProfile(profile)}
+                                style={{
+                                    background: gateProfile === profile ? '#ff6b35' : 'transparent',
+                                    color: gateProfile === profile ? '#fff' : '#9ca3af',
+                                    border: gateProfile === profile ? '1px solid #ff6b35' : '1px solid #374151',
+                                    borderRadius: 6,
+                                    padding: '0.35rem 0.6rem',
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {profile === 'strict' ? 'Strict' : 'Hackathon'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.68rem', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Feed Reliability
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {(['balanced', 'strict'] as const).map((modeName) => (
+                            <button
+                                key={modeName}
+                                onClick={() => setFeedReliabilityMode(modeName)}
+                                style={{
+                                    background: feedReliabilityMode === modeName ? '#2563eb' : 'transparent',
+                                    color: feedReliabilityMode === modeName ? '#fff' : '#9ca3af',
+                                    border: feedReliabilityMode === modeName ? '1px solid #2563eb' : '1px solid #374151',
+                                    borderRadius: 6,
+                                    padding: '0.35rem 0.6rem',
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {modeName === 'balanced' ? 'Balanced' : 'Strict'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.68rem', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Launch Safety Lock
+                    </div>
+                    <button
+                        onClick={() => setLaunchSafetyLocked((prev) => !prev)}
+                        style={{
+                            background: launchSafetyLocked ? '#7f1d1d' : '#14532d',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '0.35rem 0.65rem',
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        {launchSafetyLocked ? 'LOCKED' : 'UNLOCKED'}
+                    </button>
+                </div>
+            </div>
+
             {/* Winner Banner */}
             {comp.status === 'complete' && winnerCell && (
                 <div style={{
@@ -912,11 +1044,13 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             <div style={{ color: winnerGate.eligible ? '#22c55e' : '#ef4444', fontWeight: 700, marginBottom: '0.3rem' }}>
                                 Graduation Gate: {winnerGate.eligible ? 'PASS' : 'BLOCKED'}
                             </div>
+                            <div>Profile {winnerGate.profile.toUpperCase()} / Feed mode {winnerGate.feedReliabilityMode.toUpperCase()}</div>
                             <div>PnL {winnerCell.portfolio.totalPnL.toFixed(2)} / Required {winnerGate.minPnlRequired.toFixed(2)} SOL</div>
-                            <div>Drawdown {winnerCell.portfolio.maxDrawdown.toFixed(1)}% / Max {GRAD_MAX_DRAWDOWN_PERCENT}%</div>
-                            <div>Consistency {winnerGate.consistencyPercent.toFixed(1)}% / Min {GRAD_MIN_CONSISTENCY_PERCENT}%</div>
-                            <div>Risk Violations {winnerGate.riskViolations} / Required 0</div>
-                            <div>Weekly Graduations {winnerGate.weeklyGraduations} / Max {GRAD_MAX_WEEKLY}</div>
+                            <div>Drawdown {winnerCell.portfolio.maxDrawdown.toFixed(1)}% / Max {winnerGate.maxDrawdownPercent}%</div>
+                            <div>Consistency {winnerGate.consistencyPercent.toFixed(1)}% / Min {winnerGate.minConsistencyPercent}%</div>
+                            <div>Risk Violations {winnerGate.riskViolations} / Max {winnerGate.maxRiskViolations}</div>
+                            <div>Weekly Graduations {winnerGate.weeklyGraduations} / Max {winnerGate.maxWeeklyGraduations}</div>
+                            <div>Feed Check {winnerGate.checks.feed ? 'PASS' : 'BLOCKED'} ({feedHealth.status})</div>
                             {!winnerGate.eligible && (
                                 <div style={{ marginTop: '0.3rem', color: '#ef4444' }}>
                                     {winnerGate.reasons.join(' | ')}
@@ -975,12 +1109,29 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                     >
                         Download Season Receipt
                     </button>
-                    {gradStatus === 'idle' && authenticated && winnerGate?.eligible && (
+                    {gradStatus === 'idle' && winnerGate?.eligible && (
+                        <div style={{
+                            marginBottom: '0.8rem',
+                            color: launchSafetyLocked ? '#ef4444' : '#22c55e',
+                            fontSize: '0.78rem',
+                        }}>
+                            Safety Lock: {launchSafetyLocked ? 'LOCKED (launch blocked)' : 'UNLOCKED'}
+                        </div>
+                    )}
+                    {gradStatus === 'idle' && authenticated && winnerGate?.eligible && !launchSafetyLocked && (
                         <button onClick={() => handleGraduate(winnerCell)} style={{
                             background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
                         }}>
                             Graduate to Pump.fun
+                        </button>
+                    )}
+                    {gradStatus === 'idle' && authenticated && winnerGate?.eligible && launchSafetyLocked && (
+                        <button disabled style={{
+                            background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 6,
+                            padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'not-allowed',
+                        }}>
+                            Unlock Safety Lock to Launch
                         </button>
                     )}
                     {gradStatus === 'idle' && authenticated && winnerGate && !winnerGate.eligible && (
@@ -991,13 +1142,18 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             Graduation Blocked
                         </button>
                     )}
-                    {gradStatus === 'idle' && !authenticated && winnerGate?.eligible && (
+                    {gradStatus === 'idle' && !authenticated && winnerGate?.eligible && !launchSafetyLocked && (
                         <button onClick={login} style={{
                             background: '#ff6b35', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', cursor: 'pointer',
                         }}>
                             Connect Wallet to Graduate
                         </button>
+                    )}
+                    {gradStatus === 'idle' && !authenticated && winnerGate?.eligible && launchSafetyLocked && (
+                        <div style={{ color: '#fca5a5', fontSize: '0.8rem' }}>
+                            Unlock safety lock first, then connect wallet.
+                        </div>
                     )}
                     {gradStatus === 'idle' && !authenticated && winnerGate && !winnerGate.eligible && (
                         <div style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
@@ -1423,7 +1579,13 @@ function buildCellComposition(cell: TradingCell, agents: Record<string, PnLAgent
     return `Cell identity: ${cell.name}\nRole composition: ${roleSummary}\nAgent roster:\n${roster}`;
 }
 
-function evaluateGraduationGate(cell: TradingCell): GraduationGateResult {
+function evaluateGraduationGate(
+    cell: TradingCell,
+    profile: GraduationGateProfile,
+    feedHealth: MarketFeedHealth,
+    feedReliabilityMode: FeedReliabilityMode,
+): GraduationGateResult {
+    const config = GATE_PROFILE_CONFIG[profile];
     const graduated = [...getGraduatedAgents()].sort((a, b) => b.graduatedAt - a.graduatedAt);
     const now = Date.now();
     const thisWeek = getWeekKey(now);
@@ -1431,36 +1593,44 @@ function evaluateGraduationGate(cell: TradingCell): GraduationGateResult {
     const lastGraduationAt = graduated[0]?.graduatedAt;
     const weeksSinceLastGraduation = lastGraduationAt ? Math.floor((now - lastGraduationAt) / WEEK_MS) : 0;
     const minPnlRequired = weeksSinceLastGraduation >= GRAD_RELAX_AFTER_WEEKS
-        ? GRAD_RELAXED_MIN_PNL_SOL
-        : GRAD_MIN_PNL_SOL;
+        ? config.relaxedMinPnlSOL
+        : config.minPnlSOL;
 
     const pnlCheck = cell.portfolio.totalPnL >= minPnlRequired;
-    const drawdownCheck = cell.portfolio.maxDrawdown <= GRAD_MAX_DRAWDOWN_PERCENT;
+    const drawdownCheck = cell.portfolio.maxDrawdown <= config.maxDrawdownPercent;
     const totalRounds = Math.max(1, cell.roundPnL.length);
     const positiveRounds = cell.roundPnL.filter((v) => v > 0).length;
     const consistencyPercent = (positiveRounds / totalRounds) * 100;
-    const consistencyCheck = consistencyPercent >= GRAD_MIN_CONSISTENCY_PERCENT;
+    const consistencyCheck = consistencyPercent >= config.minConsistencyPercent;
     const totalValue = Math.max(cell.portfolio.totalValue, 0.000001);
     const riskViolations = cell.portfolio.positions.reduce((count, pos) => {
         const weight = (pos.currentPrice * pos.quantity) / totalValue;
         return count + (weight > MAX_POSITION_PERCENT + 0.0001 ? 1 : 0);
     }, 0);
-    const riskCheck = riskViolations === 0;
-    const weeklySlotCheck = weeklyGraduations < GRAD_MAX_WEEKLY;
+    const riskCheck = riskViolations <= config.maxRiskViolations;
+    const weeklySlotCheck = weeklyGraduations < config.maxWeeklyGraduations;
+    const feedCheck = isMarketFeedReliable(feedReliabilityMode, feedHealth);
 
     const reasons: string[] = [];
     if (!pnlCheck) reasons.push(`PnL < +${minPnlRequired.toFixed(0)} SOL`);
-    if (!drawdownCheck) reasons.push(`drawdown > ${GRAD_MAX_DRAWDOWN_PERCENT}%`);
-    if (!consistencyCheck) reasons.push(`consistency < ${GRAD_MIN_CONSISTENCY_PERCENT}%`);
-    if (!riskCheck) reasons.push('risk violations > 0');
+    if (!drawdownCheck) reasons.push(`drawdown > ${config.maxDrawdownPercent}%`);
+    if (!consistencyCheck) reasons.push(`consistency < ${config.minConsistencyPercent}%`);
+    if (!riskCheck) reasons.push(`risk violations > ${config.maxRiskViolations}`);
     if (!weeklySlotCheck) reasons.push('weekly graduation slot exhausted');
+    if (!feedCheck) reasons.push(`feed ${feedHealth.status} blocked by ${feedReliabilityMode} mode`);
 
     return {
-        eligible: pnlCheck && drawdownCheck && consistencyCheck && riskCheck && weeklySlotCheck,
+        profile,
+        feedReliabilityMode,
+        eligible: pnlCheck && drawdownCheck && consistencyCheck && riskCheck && weeklySlotCheck && feedCheck,
         minPnlRequired,
+        maxDrawdownPercent: config.maxDrawdownPercent,
         consistencyPercent,
+        minConsistencyPercent: config.minConsistencyPercent,
         riskViolations,
+        maxRiskViolations: config.maxRiskViolations,
         weeklyGraduations,
+        maxWeeklyGraduations: config.maxWeeklyGraduations,
         weeksSinceLastGraduation,
         checks: {
             pnl: pnlCheck,
@@ -1468,6 +1638,7 @@ function evaluateGraduationGate(cell: TradingCell): GraduationGateResult {
             consistency: consistencyCheck,
             risk: riskCheck,
             weeklySlot: weeklySlotCheck,
+            feed: feedCheck,
         },
         reasons,
     };
@@ -1507,13 +1678,24 @@ interface SeasonReceipt {
         trustScore: number;
     };
     gate: {
+        profile: GraduationGateProfile;
+        feedReliabilityMode: FeedReliabilityMode;
         eligible: boolean;
         minPnlRequired: number;
+        maxDrawdownPercent: number;
         consistencyPercent: number;
+        minConsistencyPercent: number;
         riskViolations: number;
+        maxRiskViolations: number;
         weeklyGraduations: number;
+        maxWeeklyGraduations: number;
         reasons: string[];
         checks: GraduationGateResult['checks'];
+    };
+    policy: {
+        gateProfile: GraduationGateProfile;
+        feedReliabilityMode: FeedReliabilityMode;
+        launchSafetyLocked: boolean;
     };
     graduation: {
         minted: boolean;
@@ -1542,9 +1724,22 @@ function buildSeasonReceipt(params: {
         signature: string;
         txExplorerUrl: string;
     } | null;
-    feedHealth: ReturnType<typeof getMarketFeedHealth>;
+    feedHealth: MarketFeedHealth;
+    gateProfile: GraduationGateProfile;
+    feedReliabilityMode: FeedReliabilityMode;
+    launchSafetyLocked: boolean;
 }): SeasonReceipt {
-    const { seasonId, competition, winnerCell, gate, gradResult, feedHealth } = params;
+    const {
+        seasonId,
+        competition,
+        winnerCell,
+        gate,
+        gradResult,
+        feedHealth,
+        gateProfile,
+        feedReliabilityMode,
+        launchSafetyLocked,
+    } = params;
     return {
         seasonId,
         generatedAt: new Date().toISOString(),
@@ -1559,13 +1754,24 @@ function buildSeasonReceipt(params: {
             trustScore: computeCellTrustScore(winnerCell, gate),
         },
         gate: {
+            profile: gate.profile,
+            feedReliabilityMode: gate.feedReliabilityMode,
             eligible: gate.eligible,
             minPnlRequired: gate.minPnlRequired,
+            maxDrawdownPercent: gate.maxDrawdownPercent,
             consistencyPercent: gate.consistencyPercent,
+            minConsistencyPercent: gate.minConsistencyPercent,
             riskViolations: gate.riskViolations,
+            maxRiskViolations: gate.maxRiskViolations,
             weeklyGraduations: gate.weeklyGraduations,
+            maxWeeklyGraduations: gate.maxWeeklyGraduations,
             reasons: gate.reasons,
             checks: gate.checks,
+        },
+        policy: {
+            gateProfile,
+            feedReliabilityMode,
+            launchSafetyLocked,
         },
         graduation: {
             minted: !!gradResult,
