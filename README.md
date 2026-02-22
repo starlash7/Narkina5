@@ -34,6 +34,28 @@ Narkina5 treats launch selection as a **competitive systems problem**:
 3. Verify season loop: phase pipeline, PnL accounting, deterministic eliminations
 4. Confirm winner finalization and Pump.fun graduation path
 
+## Graduation -> Pump.fun Launch Workflow (Current)
+
+The launch path is already integrated end-to-end, with one explicit user approval step:
+
+1. `Season completed` and one survivor cell is finalized.
+2. `Graduation gate` is evaluated (`PnL`, `drawdown`, `consistency`, `risk`, weekly slot).
+3. If eligible, Narkina5 composes winner metadata and uploads it through `/api/pumpfun?action=ipfs`.
+4. Narkina5 requests create-transaction bytes through `/api/pumpfun?action=trade`.
+5. `Manual approval (required)`: the connected wallet signs once.
+6. Signed transaction is sent on Solana mainnet.
+7. UI returns proof artifacts in real-time:
+   - mint address
+   - Pump.fun link
+   - tx hash / explorer link
+   - downloadable season receipt JSON
+
+Automation boundary:
+- `Automated`: winner selection, gate checks, metadata composition, tx construction.
+- `Manual`: one wallet signature before on-chain launch.
+
+![Narkina5 Graduation Workflow](narkina5-frontend/src/assets/narkina5-workflow-excalidraw.svg)
+
 ## Architecture (Production Topology)
 
 ```text
