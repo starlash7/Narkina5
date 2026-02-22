@@ -39,7 +39,7 @@ Narkina5 treats launch selection as a **competitive systems problem**:
 The launch path is already integrated end-to-end, with one explicit user approval step:
 
 1. `Season completed` and one survivor cell is finalized.
-2. `Graduation gate` is evaluated (`PnL`, `drawdown`, `consistency`, `risk`, weekly slot).
+2. `Graduation gate` is evaluated (`PnL`, `drawdown`, `consistency`, `risk`, weekly slot, feed reliability).
 3. If eligible, Narkina5 composes winner metadata and uploads it through `/api/pumpfun?action=ipfs`.
 4. Narkina5 requests create-transaction bytes through `/api/pumpfun?action=trade`.
 5. `Manual approval (required)`: the connected wallet signs once.
@@ -53,6 +53,11 @@ The launch path is already integrated end-to-end, with one explicit user approva
 Automation boundary:
 - `Automated`: winner selection, gate checks, metadata composition, tx construction.
 - `Manual`: one wallet signature before on-chain launch.
+
+Live operator controls:
+- `Gate Profile`: `strict` or `hackathon` thresholds.
+- `Feed Reliability Mode`: `balanced` (blocks only `FAILING`) or `strict` (requires `WORKING`).
+- `Launch Safety Lock`: default `LOCKED`; must be manually unlocked before launch.
 
 ![Narkina5 Graduation Workflow](narkina5-frontend/src/assets/narkina5-workflow-excalidraw.svg)
 
@@ -101,8 +106,10 @@ Automation boundary:
 ### Reliability and Control Strategy
 
 - Market feed disruption falls back to normalized local path in `pnl-market.ts`.
+- Feed reliability mode is enforced at graduation gate evaluation time.
 - AI cost is bounded by spotlight-cell policy; non-spotlight cells use deterministic decisions.
 - Graduation is gated by floor-7 completion and winner finalization in `pnl-competition.ts`.
+- Launch safety lock requires explicit operator unlock before wallet-sign launch.
 - Transaction building and signing are isolated in `transactions.ts` and Solana wallet context.
 
 ## Arena Engine Design
@@ -167,11 +174,23 @@ Every agent carries a skill vector (`riskAppetite`, `execution`, `researchDepth`
 
 Champion cells do not auto-launch. They pass all gates:
 
-- PnL: `>= +10 SOL` (relaxed to `>= +8 SOL` after long dry streak)
-- Drawdown: `<= 15%`
-- Consistency: `>= 55%`
-- Risk violations: `0`
-- Throughput cap: max `1 graduation per season window`
+- Strict profile:
+  - PnL: `>= +10 SOL` (relaxed to `>= +8 SOL` after long dry streak)
+  - Drawdown: `<= 15%`
+  - Consistency: `>= 55%`
+  - Risk violations: `<= 0`
+  - Throughput cap: `1` graduation per season window
+- Hackathon profile:
+  - PnL: `>= +6 SOL` (relaxed to `>= +5 SOL`)
+  - Drawdown: `<= 22%`
+  - Consistency: `>= 45%`
+  - Risk violations: `<= 1`
+  - Throughput cap: max(`2`, default cap)
+- Feed gate:
+  - `balanced`: launch blocked only when feed is `FAILING`
+  - `strict`: launch blocked unless feed is `WORKING`
+- Safety lock:
+  - launch action is disabled while lock is `LOCKED`
 
 If any gate fails, champion metadata is retained but launch is blocked.
 
@@ -240,6 +259,8 @@ narkina5-frontend/
   - healthy-market decision generation
   - toxic-buy veto path
   - valid-buy execution path
+- Market guardrail tests are included:
+  - feed reliability mode behavior (`balanced` vs `strict`)
 
 ## Local Setup
 
