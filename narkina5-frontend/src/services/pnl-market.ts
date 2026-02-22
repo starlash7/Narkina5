@@ -34,6 +34,7 @@ const PRICE_TTL = 30 * 1000;          // 30 seconds
 // ---------------------------------------------------------------------------
 
 export type MarketFeedStatus = 'WORKING' | 'FLAKY' | 'FAILING';
+export type FeedReliabilityMode = 'balanced' | 'strict';
 
 export interface MarketFeedHealth {
     status: MarketFeedStatus;
@@ -67,6 +68,14 @@ function markFeedFailure(error: unknown): void {
 
 export function getMarketFeedHealth(): MarketFeedHealth {
     return { ...marketFeedHealth };
+}
+
+export function isMarketFeedReliable(
+    mode: FeedReliabilityMode,
+    health: MarketFeedHealth = marketFeedHealth,
+): boolean {
+    if (mode === 'strict') return health.status === 'WORKING';
+    return health.status !== 'FAILING';
 }
 
 // ---------------------------------------------------------------------------
