@@ -30,6 +30,46 @@ const TRENDING_TTL = 5 * 60 * 1000;  // 5 minutes
 const PRICE_TTL = 30 * 1000;          // 30 seconds
 
 // ---------------------------------------------------------------------------
+// Feed Health
+// ---------------------------------------------------------------------------
+
+export type MarketFeedStatus = 'WORKING' | 'FLAKY' | 'FAILING';
+
+export interface MarketFeedHealth {
+    status: MarketFeedStatus;
+    consecutiveErrors: number;
+    lastSuccessAt: number | null;
+    lastErrorAt: number | null;
+    lastErrorMessage: string | null;
+}
+
+const marketFeedHealth: MarketFeedHealth = {
+    status: 'WORKING',
+    consecutiveErrors: 0,
+    lastSuccessAt: null,
+    lastErrorAt: null,
+    lastErrorMessage: null,
+};
+
+function markFeedSuccess(): void {
+    marketFeedHealth.consecutiveErrors = 0;
+    marketFeedHealth.status = 'WORKING';
+    marketFeedHealth.lastSuccessAt = Date.now();
+    marketFeedHealth.lastErrorMessage = null;
+}
+
+function markFeedFailure(error: unknown): void {
+    marketFeedHealth.consecutiveErrors += 1;
+    marketFeedHealth.lastErrorAt = Date.now();
+    marketFeedHealth.lastErrorMessage = error instanceof Error ? error.message : 'Unknown market feed error';
+    marketFeedHealth.status = marketFeedHealth.consecutiveErrors >= 3 ? 'FAILING' : 'FLAKY';
+}
+
+export function getMarketFeedHealth(): MarketFeedHealth {
+    return { ...marketFeedHealth };
+}
+
+// ---------------------------------------------------------------------------
 // DexScreener response normalization
 // ---------------------------------------------------------------------------
 
@@ -79,22 +119,31 @@ export async function fetchTrendingTokens(): Promise<PumpToken[]> {
     const cached = getCached<PumpToken[]>('trending', TRENDING_TTL);
     if (cached) return cached;
 
-    const res = await fetch('/api/market?action=trending');
-    if (!res.ok) throw new Error(`Market trending failed: ${res.status}`);
+    try {
+        const res = await fetch('/api/market?action=trending');
+        if (!res.ok) throw new Error(`Market trending failed: ${res.status}`);
 
-    const boosts: Array<{ tokenAddress?: string; chainId?: string }> = await res.json();
+        const boosts: Array<{ tokenAddress?: string; chainId?: string }> = await res.json();
 
-    // Boosts are just addresses — we need to fetch full details
-    const mints = boosts
-        .map((b) => b.tokenAddress)
-        .filter((m): m is string => !!m)
-        .slice(0, 20);
+        // Boosts are just addresses — we need to fetch full details
+        const mints = boosts
+            .map((b) => b.tokenAddress)
+            .filter((m): m is string => !!m)
+            .slice(0, 20);
 
-    if (mints.length === 0) return [];
+        if (mints.length === 0) {
+            markFeedSuccess();
+            return [];
+        }
 
-    const tokens = await fetchTokensByMints(mints);
-    setCache('trending', tokens);
-    return tokens;
+        const tokens = await fetchTokensByMints(mints);
+        setCache('trending', tokens);
+        markFeedSuccess();
+        return tokens;
+    } catch (error) {
+        markFeedFailure(error);
+        throw error;
+    }
 }
 
 /**
@@ -103,28 +152,34 @@ export async function fetchTrendingTokens(): Promise<PumpToken[]> {
 export async function fetchTokensByMints(mints: string[]): Promise<PumpToken[]> {
     if (mints.length === 0) return [];
 
-    const res = await fetch(`/api/market?action=prices&mints=${mints.join(',')}`);
-    if (!res.ok) throw new Error(`Market prices failed: ${res.status}`);
+    try {
+        const res = await fetch(`/api/market?action=prices&mints=${mints.join(',')}`);
+        if (!res.ok) throw new Error(`Market prices failed: ${res.status}`);
 
-    const pairs: DexPair[] = await res.json();
+        const pairs: DexPair[] = await res.json();
 
-    // Deduplicate by mint (DexScreener may return multiple pairs per token)
-    const seen = new Set<string>();
-    const tokens: PumpToken[] = [];
-    for (const pair of pairs) {
-        const token = pairToToken(pair);
-        if (token && !seen.has(token.mint)) {
-            seen.add(token.mint);
-            tokens.push(token);
+        // Deduplicate by mint (DexScreener may return multiple pairs per token)
+        const seen = new Set<string>();
+        const tokens: PumpToken[] = [];
+        for (const pair of pairs) {
+            const token = pairToToken(pair);
+            if (token && !seen.has(token.mint)) {
+                seen.add(token.mint);
+                tokens.push(token);
+            }
         }
-    }
 
-    // Cache individual token prices
-    for (const t of tokens) {
-        setCache(`price:${t.mint}`, t.priceSOL);
-    }
+        // Cache individual token prices
+        for (const t of tokens) {
+            setCache(`price:${t.mint}`, t.priceSOL);
+        }
 
-    return tokens;
+        markFeedSuccess();
+        return tokens;
+    } catch (error) {
+        markFeedFailure(error);
+        throw error;
+    }
 }
 
 /**
@@ -134,16 +189,25 @@ export async function fetchTokenPrice(mint: string): Promise<number> {
     const cached = getCached<number>(`price:${mint}`, PRICE_TTL);
     if (cached !== null) return cached;
 
-    const res = await fetch(`/api/market?action=token&mint=${mint}`);
-    if (!res.ok) throw new Error(`Market token failed: ${res.status}`);
+    try {
+        const res = await fetch(`/api/market?action=token&mint=${mint}`);
+        if (!res.ok) throw new Error(`Market token failed: ${res.status}`);
 
-    const pairs: DexPair[] = await res.json();
-    const pair = pairs[0];
-    if (!pair) return 0;
+        const pairs: DexPair[] = await res.json();
+        const pair = pairs[0];
+        if (!pair) {
+            markFeedSuccess();
+            return 0;
+        }
 
-    const price = parseFloat(pair.priceNative || '0');
-    setCache(`price:${mint}`, price);
-    return price;
+        const price = parseFloat(pair.priceNative || '0');
+        setCache(`price:${mint}`, price);
+        markFeedSuccess();
+        return price;
+    } catch (error) {
+        markFeedFailure(error);
+        throw error;
+    }
 }
 
 /**
