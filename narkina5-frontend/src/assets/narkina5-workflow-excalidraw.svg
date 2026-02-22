@@ -1,84 +1,96 @@
-<svg width="1440" height="860" viewBox="0 0 1440 860" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Narkina5 graduation to pump.fun workflow">
+<svg width="1600" height="980" viewBox="0 0 1600 980" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Narkina5 graduation to Pump.fun workflow">
   <defs>
-    <filter id="paper">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise"/>
-      <feColorMatrix in="noise" type="saturate" values="0"/>
-      <feComponentTransfer>
-        <feFuncA type="table" tableValues="0 0.03"/>
-      </feComponentTransfer>
-    </filter>
-    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
-      <path d="M 1 1 L 11 6 L 1 11" fill="none" stroke="#1f2937" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#060910"/>
+      <stop offset="55%" stop-color="#0a111d"/>
+      <stop offset="100%" stop-color="#0f1624"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(76, 90, 117, 0.22)" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c7d2fe"/>
     </marker>
     <style>
-      .bg { fill: #fffdf7; }
-      .grain { fill: #000; filter: url(#paper); }
-      .box { fill: #fff7e8; stroke: #1f2937; stroke-width: 3; rx: 18; ry: 18; }
-      .box-alt { fill: #edf7ff; stroke: #1f2937; stroke-width: 3; rx: 18; ry: 18; }
-      .box-warn { fill: #ffe8d9; stroke: #b45309; stroke-width: 3; rx: 18; ry: 18; }
-      .txt { fill: #111827; font-family: "Virgil", "Comic Sans MS", cursive; font-size: 24px; font-weight: 700; }
-      .sub { fill: #374151; font-family: "Virgil", "Comic Sans MS", cursive; font-size: 18px; font-weight: 600; }
-      .title { fill: #0f172a; font-family: "Virgil", "Comic Sans MS", cursive; font-size: 38px; font-weight: 700; }
-      .arrow { stroke: #1f2937; stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
-      .arrow-soft { stroke: #4b5563; stroke-width: 2.8; fill: none; stroke-dasharray: 8 8; marker-end: url(#arrow); }
+      .title { fill: #f3f4f6; font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 46px; font-weight: 700; letter-spacing: 0.01em; }
+      .subtitle { fill: #a5b4fc; font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 20px; font-weight: 500; }
+      .lane { fill: #64748b; font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+      .box { fill: rgba(15, 23, 42, 0.9); stroke: #475569; stroke-width: 2.8; rx: 16; }
+      .box-hot { fill: rgba(47, 24, 14, 0.95); stroke: #f97316; stroke-width: 3.2; rx: 16; }
+      .box-soft { fill: rgba(13, 24, 32, 0.92); stroke: #0ea5e9; stroke-width: 2.8; rx: 16; }
+      .step { fill: #f8fafc; font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 36px; font-weight: 700; }
+      .step-sub { fill: #94a3b8; font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace; font-size: 18px; font-weight: 500; }
+      .bullet { fill: #dbeafe; font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace; font-size: 16px; }
+      .arrow { fill: none; stroke: #c7d2fe; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .arrow-dash { fill: none; stroke: #f59e0b; stroke-width: 2.5; stroke-dasharray: 10 8; stroke-linecap: round; marker-end: url(#arrow); }
+      .glow { fill: rgba(249, 115, 22, 0.12); }
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1440" height="860"/>
-  <rect class="grain" x="0" y="0" width="1440" height="860"/>
+  <rect x="0" y="0" width="1600" height="980" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1600" height="980" fill="url(#grid)"/>
 
-  <text class="title" x="56" y="70">NARKINA5: Graduation -&gt; Pump.fun Launch Workflow</text>
-  <text class="sub" x="56" y="104">Automated pipeline with one explicit wallet signature approval</text>
+  <rect class="glow" x="980" y="390" width="330" height="150" rx="20"/>
 
-  <rect class="box" x="70" y="150" width="300" height="120" transform="rotate(-1 220 210)"/>
-  <text class="txt" x="115" y="203">1) Run Season</text>
-  <text class="sub" x="115" y="233">64 cells, 7 floors</text>
+  <text class="title" x="64" y="74">NARKINA5: Graduation -> Pump.fun Launch Workflow</text>
+  <text class="subtitle" x="64" y="108">Automated pipeline with a single explicit wallet signature approval</text>
 
-  <rect class="box" x="450" y="150" width="300" height="120" transform="rotate(1 600 210)"/>
-  <text class="txt" x="495" y="203">2) Survivor Cell</text>
-  <text class="sub" x="495" y="233">Winner finalized</text>
+  <text class="lane" x="68" y="154">Arena Survival Layer</text>
+  <text class="lane" x="68" y="414">Launch Execution Layer</text>
+  <text class="lane" x="68" y="694">Proof + Settlement Layer</text>
 
-  <rect class="box" x="830" y="150" width="300" height="120" transform="rotate(-1 980 210)"/>
-  <text class="txt" x="865" y="203">3) Gate Check</text>
-  <text class="sub" x="865" y="233">PnL / DD / consistency / risk</text>
+  <rect class="box" x="60" y="180" width="300" height="120"/>
+  <text class="step" x="90" y="228">1) Run Season</text>
+  <text class="step-sub" x="90" y="265">64 cells, 7 floors</text>
 
-  <rect class="box-alt" x="1210" y="150" width="180" height="120" transform="rotate(1 1300 210)"/>
-  <text class="txt" x="1241" y="204">PASS?</text>
-  <text class="sub" x="1236" y="233">if yes, launch flow</text>
+  <rect class="box" x="400" y="180" width="300" height="120"/>
+  <text class="step" x="430" y="228">2) Survivor Cell</text>
+  <text class="step-sub" x="430" y="265">winner finalized</text>
 
-  <path class="arrow" d="M 365 210 C 390 210, 420 210, 445 210"/>
-  <path class="arrow" d="M 745 210 C 770 210, 800 210, 825 210"/>
-  <path class="arrow" d="M 1125 210 C 1152 210, 1180 210, 1205 210"/>
+  <rect class="box-hot" x="740" y="180" width="300" height="120"/>
+  <text class="step" x="770" y="228">3) Gate Check</text>
+  <text class="step-sub" x="770" y="265">PnL / drawdown / consistency / risk</text>
 
-  <rect class="box-alt" x="120" y="360" width="340" height="120" transform="rotate(1 290 420)"/>
-  <text class="txt" x="155" y="412">4) Build Metadata</text>
-  <text class="sub" x="155" y="442">/api/pumpfun?action=ipfs</text>
+  <rect class="box-soft" x="1080" y="180" width="250" height="120"/>
+  <text class="step" x="1114" y="228">4) PASS?</text>
+  <text class="step-sub" x="1114" y="265">if yes, continue launch</text>
 
-  <rect class="box-alt" x="550" y="360" width="340" height="120" transform="rotate(-1 720 420)"/>
-  <text class="txt" x="585" y="412">5) Build Create Tx</text>
-  <text class="sub" x="585" y="442">/api/pumpfun?action=trade</text>
+  <path class="arrow" d="M 360 240 L 398 240"/>
+  <path class="arrow" d="M 700 240 L 738 240"/>
+  <path class="arrow" d="M 1040 240 L 1078 240"/>
 
-  <rect class="box-warn" x="980" y="360" width="360" height="120" transform="rotate(1 1160 420)"/>
-  <text class="txt" x="1015" y="410">6) Wallet Signature</text>
-  <text class="sub" x="1015" y="440">Manual approval (1 click)</text>
+  <rect class="box" x="150" y="450" width="320" height="120"/>
+  <text class="step" x="178" y="498">5) Build Metadata</text>
+  <text class="step-sub" x="178" y="535">/api/pumpfun?action=ipfs</text>
 
-  <path class="arrow" d="M 1295 272 C 1220 305, 1130 330, 1035 365"/>
-  <path class="arrow" d="M 455 420 C 485 420, 515 420, 545 420"/>
-  <path class="arrow" d="M 895 420 C 920 420, 950 420, 975 420"/>
+  <rect class="box" x="510" y="450" width="320" height="120"/>
+  <text class="step" x="538" y="498">6) Build Create Tx</text>
+  <text class="step-sub" x="538" y="535">/api/pumpfun?action=trade</text>
 
-  <rect class="box" x="170" y="570" width="420" height="140" transform="rotate(-1 380 640)"/>
-  <text class="txt" x="210" y="624">7) Send On-chain</text>
-  <text class="sub" x="210" y="654">Solana mainnet tx broadcast + confirm</text>
+  <rect class="box-hot" x="930" y="450" width="360" height="120"/>
+  <text class="step" x="958" y="498">7) Wallet Signature</text>
+  <text class="step-sub" x="958" y="535">manual approval (single click)</text>
 
-  <rect class="box" x="730" y="570" width="620" height="190" transform="rotate(1 1040 665)"/>
-  <text class="txt" x="775" y="624">8) Launch Artifacts (UI Proof)</text>
-  <text class="sub" x="775" y="654">- Mint address</text>
-  <text class="sub" x="775" y="680">- Pump.fun URL</text>
-  <text class="sub" x="775" y="706">- Tx hash + explorer link</text>
-  <text class="sub" x="775" y="732">- Season receipt JSON</text>
+  <path class="arrow" d="M 470 510 L 508 510"/>
+  <path class="arrow" d="M 830 510 L 928 510"/>
+  <path class="arrow" d="M 1210 302 C 1210 350, 1120 388, 1110 448"/>
 
-  <path class="arrow" d="M 1130 485 C 1050 540, 960 575, 860 610"/>
-  <path class="arrow" d="M 595 640 C 635 640, 675 640, 725 640"/>
-  <path class="arrow-soft" d="M 380 563 C 365 520, 325 490, 290 480"/>
-  <text class="sub" x="205" y="520">if gate fails -&gt; keep champion metadata, block launch</text>
+  <rect class="box" x="80" y="760" width="520" height="90"/>
+  <text class="step-sub" x="114" y="813">Gate FAIL branch: keep champion metadata + season receipt, block token launch</text>
+  <path class="arrow-dash" d="M 840 304 C 780 430, 690 560, 420 760"/>
+
+  <rect class="box" x="220" y="680" width="430" height="150"/>
+  <text class="step" x="250" y="728">8) Send On-chain</text>
+  <text class="step-sub" x="250" y="765">Solana mainnet tx broadcast + confirm</text>
+
+  <rect class="box-soft" x="760" y="660" width="760" height="220"/>
+  <text class="step" x="792" y="710">9) Launch Artifacts (UI Proof)</text>
+  <text class="bullet" x="792" y="748">- Mint address</text>
+  <text class="bullet" x="792" y="775">- Pump.fun URL</text>
+  <text class="bullet" x="792" y="802">- Tx hash + explorer link</text>
+  <text class="bullet" x="792" y="829">- Season receipt JSON</text>
+  <text class="bullet" x="792" y="856">- Feed health + trust score snapshot</text>
+
+  <path class="arrow" d="M 651 755 L 758 755"/>
+  <path class="arrow" d="M 1090 572 C 1090 620, 1050 635, 1030 658"/>
 </svg>
