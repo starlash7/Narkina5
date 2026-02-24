@@ -19,9 +19,10 @@ import {
     fetchTrendingTokens,
     refreshPrices,
     getMarketFeedHealth,
-    isMarketFeedReliable,
 } from '../services/pnl-market';
-import type { FeedReliabilityMode, MarketFeedHealth } from '../services/pnl-market';
+import type { FeedReliabilityMode } from '../services/pnl-market';
+import { evaluateGraduationGate } from '../services/pnl-gate';
+import type { GraduationGateProfile, GraduationGateResult } from '../services/pnl-gate';
 import {
     ROLE_COLORS,
     ROLE_LABELS,
@@ -31,9 +32,6 @@ import {
     CELLS_COUNT,
     FLOOR_BRACKET,
     ELIMINATION_SCHEDULE,
-    MAX_POSITION_PERCENT,
-    SEASON_DURATION_DAYS,
-    MAX_GRADUATIONS_PER_SEASON,
     RELAX_GATE_AFTER_SEASONS,
 } from '../services/pnl-types';
 import type {
@@ -53,78 +51,18 @@ import {
     generateTokenDescription,
     getPumpfunUrl,
     saveGraduatedAgent,
-    getGraduatedAgents,
 } from '../services/pumpfun';
 import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } from '../components/Icons';
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
 type PnLArenaMode = 'overview' | 'live';
-type GraduationGateProfile = 'strict' | 'hackathon';
 const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 const SOLANA_CHAIN = 'solana:mainnet';
 const SOLSCAN_TX_BASE = 'https://solscan.io/tx/';
 const CELLS_PER_PAGE = 8;
-const SEASON_MS = SEASON_DURATION_DAYS * 24 * 60 * 60 * 1000;
-const WEEK_MS = SEASON_MS;
-const GRAD_MIN_PNL_SOL = 10;
-const GRAD_RELAXED_MIN_PNL_SOL = 8;
 const GRAD_MAX_DRAWDOWN_PERCENT = 15;
-const GRAD_MIN_CONSISTENCY_PERCENT = 55;
-const GRAD_MAX_WEEKLY = MAX_GRADUATIONS_PER_SEASON;
 const GRAD_RELAX_AFTER_WEEKS = RELAX_GATE_AFTER_SEASONS;
 const RECEIPT_RULE_VERSION = '2026-02-22';
-
-interface GateProfileConfig {
-    minPnlSOL: number;
-    relaxedMinPnlSOL: number;
-    maxDrawdownPercent: number;
-    minConsistencyPercent: number;
-    maxRiskViolations: number;
-    maxWeeklyGraduations: number;
-}
-
-const GATE_PROFILE_CONFIG: Record<GraduationGateProfile, GateProfileConfig> = {
-    strict: {
-        minPnlSOL: GRAD_MIN_PNL_SOL,
-        relaxedMinPnlSOL: GRAD_RELAXED_MIN_PNL_SOL,
-        maxDrawdownPercent: GRAD_MAX_DRAWDOWN_PERCENT,
-        minConsistencyPercent: GRAD_MIN_CONSISTENCY_PERCENT,
-        maxRiskViolations: 0,
-        maxWeeklyGraduations: GRAD_MAX_WEEKLY,
-    },
-    hackathon: {
-        minPnlSOL: 6,
-        relaxedMinPnlSOL: 5,
-        maxDrawdownPercent: 22,
-        minConsistencyPercent: 45,
-        maxRiskViolations: 1,
-        maxWeeklyGraduations: Math.max(2, GRAD_MAX_WEEKLY),
-    },
-};
-
-interface GraduationGateResult {
-    profile: GraduationGateProfile;
-    feedReliabilityMode: FeedReliabilityMode;
-    eligible: boolean;
-    minPnlRequired: number;
-    maxDrawdownPercent: number;
-    consistencyPercent: number;
-    minConsistencyPercent: number;
-    riskViolations: number;
-    maxRiskViolations: number;
-    weeklyGraduations: number;
-    maxWeeklyGraduations: number;
-    weeksSinceLastGraduation: number;
-    checks: {
-        pnl: boolean;
-        drawdown: boolean;
-        consistency: boolean;
-        risk: boolean;
-        weeklySlot: boolean;
-        feed: boolean;
-    };
-    reasons: string[];
-}
 
 function getFloorFromRound(round: number, complete: boolean): number {
     if (complete) return TOTAL_FLOORS;
@@ -1549,15 +1487,6 @@ function toCellSymbol(cellName: string): string {
     return symbol.slice(0, 10) || 'N5CELL';
 }
 
-function getWeekKey(timestamp: number): string {
-    const date = new Date(timestamp);
-    const day = date.getUTCDay() || 7;
-    date.setUTCDate(date.getUTCDate() + 4 - day);
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-}
-
 function buildCellComposition(cell: TradingCell, agents: Record<string, PnLAgent>): string {
     const roster = cell.agents
         .map((id, idx) => {
@@ -1577,71 +1506,6 @@ function buildCellComposition(cell: TradingCell, agents: Record<string, PnLAgent
         .join(', ');
 
     return `Cell identity: ${cell.name}\nRole composition: ${roleSummary}\nAgent roster:\n${roster}`;
-}
-
-function evaluateGraduationGate(
-    cell: TradingCell,
-    profile: GraduationGateProfile,
-    feedHealth: MarketFeedHealth,
-    feedReliabilityMode: FeedReliabilityMode,
-): GraduationGateResult {
-    const config = GATE_PROFILE_CONFIG[profile];
-    const graduated = [...getGraduatedAgents()].sort((a, b) => b.graduatedAt - a.graduatedAt);
-    const now = Date.now();
-    const thisWeek = getWeekKey(now);
-    const weeklyGraduations = graduated.filter((g) => getWeekKey(g.graduatedAt) === thisWeek).length;
-    const lastGraduationAt = graduated[0]?.graduatedAt;
-    const weeksSinceLastGraduation = lastGraduationAt ? Math.floor((now - lastGraduationAt) / WEEK_MS) : 0;
-    const minPnlRequired = weeksSinceLastGraduation >= GRAD_RELAX_AFTER_WEEKS
-        ? config.relaxedMinPnlSOL
-        : config.minPnlSOL;
-
-    const pnlCheck = cell.portfolio.totalPnL >= minPnlRequired;
-    const drawdownCheck = cell.portfolio.maxDrawdown <= config.maxDrawdownPercent;
-    const totalRounds = Math.max(1, cell.roundPnL.length);
-    const positiveRounds = cell.roundPnL.filter((v) => v > 0).length;
-    const consistencyPercent = (positiveRounds / totalRounds) * 100;
-    const consistencyCheck = consistencyPercent >= config.minConsistencyPercent;
-    const totalValue = Math.max(cell.portfolio.totalValue, 0.000001);
-    const riskViolations = cell.portfolio.positions.reduce((count, pos) => {
-        const weight = (pos.currentPrice * pos.quantity) / totalValue;
-        return count + (weight > MAX_POSITION_PERCENT + 0.0001 ? 1 : 0);
-    }, 0);
-    const riskCheck = riskViolations <= config.maxRiskViolations;
-    const weeklySlotCheck = weeklyGraduations < config.maxWeeklyGraduations;
-    const feedCheck = isMarketFeedReliable(feedReliabilityMode, feedHealth);
-
-    const reasons: string[] = [];
-    if (!pnlCheck) reasons.push(`PnL < +${minPnlRequired.toFixed(0)} SOL`);
-    if (!drawdownCheck) reasons.push(`drawdown > ${config.maxDrawdownPercent}%`);
-    if (!consistencyCheck) reasons.push(`consistency < ${config.minConsistencyPercent}%`);
-    if (!riskCheck) reasons.push(`risk violations > ${config.maxRiskViolations}`);
-    if (!weeklySlotCheck) reasons.push('weekly graduation slot exhausted');
-    if (!feedCheck) reasons.push(`feed ${feedHealth.status} blocked by ${feedReliabilityMode} mode`);
-
-    return {
-        profile,
-        feedReliabilityMode,
-        eligible: pnlCheck && drawdownCheck && consistencyCheck && riskCheck && weeklySlotCheck && feedCheck,
-        minPnlRequired,
-        maxDrawdownPercent: config.maxDrawdownPercent,
-        consistencyPercent,
-        minConsistencyPercent: config.minConsistencyPercent,
-        riskViolations,
-        maxRiskViolations: config.maxRiskViolations,
-        weeklyGraduations,
-        maxWeeklyGraduations: config.maxWeeklyGraduations,
-        weeksSinceLastGraduation,
-        checks: {
-            pnl: pnlCheck,
-            drawdown: drawdownCheck,
-            consistency: consistencyCheck,
-            risk: riskCheck,
-            weeklySlot: weeklySlotCheck,
-            feed: feedCheck,
-        },
-        reasons,
-    };
 }
 
 function clampNumber(value: number, min: number, max: number): number {
@@ -1724,7 +1588,7 @@ function buildSeasonReceipt(params: {
         signature: string;
         txExplorerUrl: string;
     } | null;
-    feedHealth: MarketFeedHealth;
+    feedHealth: ReturnType<typeof getMarketFeedHealth>;
     gateProfile: GraduationGateProfile;
     feedReliabilityMode: FeedReliabilityMode;
     launchSafetyLocked: boolean;
