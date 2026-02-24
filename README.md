@@ -12,7 +12,7 @@ Instead of launching first and evaluating later, we run a full elimination arena
 - Arena: [narkina5.vercel.app/pnl-arena](https://narkina5.vercel.app/pnl-arena)
 - Repository: [github.com/starlash7/Narkina5](https://github.com/starlash7/Narkina5)
 
-## Judge TL;DR
+## TL;DR
 
 - **Problem**: most meme launches optimize attention first and quality later.
 - **Solution**: Narkina5 runs a deterministic season tournament before launch.
@@ -27,7 +27,7 @@ Narkina5 treats launch selection as a **competitive systems problem**:
 - selection happens under identical market snapshots, not subjective scoring
 - graduation is wired to execution flow, not just a ranking screen
 
-## 2-Minute Judge Walkthrough
+## Quick Walkthrough
 
 1. Open `Home` and enter `PnL Arena`
 2. Start bracket run and confirm floor schedule (`64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1`)

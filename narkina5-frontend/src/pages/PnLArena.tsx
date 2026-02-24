@@ -121,7 +121,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
         txExplorerUrl: string;
     } | null>(null);
     const [seasonId] = useState(() => Date.now());
-    const [gateProfile, setGateProfile] = useState<GraduationGateProfile>('hackathon');
+    const [gateProfile, setGateProfile] = useState<GraduationGateProfile>('relaxed');
     const [feedReliabilityMode, setFeedReliabilityMode] = useState<FeedReliabilityMode>('balanced');
     const [launchSafetyLocked, setLaunchSafetyLocked] = useState(true);
     const applyOperatorPreset = useCallback((preset: OperatorPreset) => {
@@ -908,7 +908,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                         <button
-                            onClick={() => applyOperatorPreset('hackathon_demo')}
+                            onClick={() => applyOperatorPreset('standard')}
                             style={{
                                 background: 'rgba(255,107,53,0.12)',
                                 color: '#ff6b35',
@@ -919,7 +919,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                                 cursor: 'pointer',
                             }}
                         >
-                            Apply Hackathon Demo
+                            Apply Standard
                         </button>
                         <button
                             onClick={() => applyOperatorPreset('production_safe')}
@@ -942,7 +942,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                         Gate Profile
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        {(['strict', 'hackathon'] as const).map((profile) => (
+                        {(['strict', 'relaxed'] as const).map((profile) => (
                             <button
                                 key={profile}
                                 onClick={() => setGateProfile(profile)}
@@ -956,7 +956,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                                     cursor: 'pointer',
                                 }}
                             >
-                                {profile === 'strict' ? 'Strict' : 'Hackathon'}
+                                {profile === 'strict' ? 'Strict' : 'Relaxed'}
                             </button>
                         ))}
                     </div>

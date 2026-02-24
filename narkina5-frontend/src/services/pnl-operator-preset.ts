@@ -1,7 +1,7 @@
 import type { GraduationGateProfile } from './pnl-gate';
 import type { FeedReliabilityMode } from './pnl-market';
 
-export type OperatorPreset = 'hackathon_demo' | 'production_safe';
+export type OperatorPreset = 'standard' | 'production_safe';
 
 export interface OperatorPresetConfig {
     gateProfile: GraduationGateProfile;
@@ -10,8 +10,8 @@ export interface OperatorPresetConfig {
 }
 
 export const OPERATOR_PRESETS: Record<OperatorPreset, OperatorPresetConfig> = {
-    hackathon_demo: {
-        gateProfile: 'hackathon',
+    standard: {
+        gateProfile: 'relaxed',
         feedReliabilityMode: 'balanced',
         launchSafetyLocked: true,
     },
