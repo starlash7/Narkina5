@@ -83,7 +83,7 @@ describe('graduation gate policy matrix', () => {
         expect(result.checks.feed).toBe(true);
     });
 
-    it('strict profile blocks single risk violation but hackathon profile allows it', () => {
+    it('strict profile blocks single risk violation but relaxed profile allows it', () => {
         const cellWithOneRiskViolation = makeCell({
             positions: [{ currentPrice: 95, quantity: 1 }],
             totalValue: 100,
@@ -97,9 +97,9 @@ describe('graduation gate policy matrix', () => {
             { now: NOW, graduatedAtTimestamps: [] },
         );
 
-        const hackathonResult = evaluateGraduationGate(
+        const relaxedResult = evaluateGraduationGate(
             cellWithOneRiskViolation,
-            'hackathon',
+            'relaxed',
             makeFeed('WORKING'),
             'balanced',
             { now: NOW, graduatedAtTimestamps: [] },
@@ -107,8 +107,8 @@ describe('graduation gate policy matrix', () => {
 
         expect(strictResult.eligible).toBe(false);
         expect(strictResult.maxRiskViolations).toBe(0);
-        expect(hackathonResult.eligible).toBe(true);
-        expect(hackathonResult.maxRiskViolations).toBe(1);
+        expect(relaxedResult.eligible).toBe(true);
+        expect(relaxedResult.maxRiskViolations).toBe(1);
     });
 
     it('weekly cap is enforced per profile', () => {
@@ -120,17 +120,17 @@ describe('graduation gate policy matrix', () => {
             { now: NOW, graduatedAtTimestamps: [NOW - 60_000] },
         );
 
-        const hackathonAllowed = evaluateGraduationGate(
+        const relaxedAllowed = evaluateGraduationGate(
             makeCell(),
-            'hackathon',
+            'relaxed',
             makeFeed('WORKING'),
             'balanced',
             { now: NOW, graduatedAtTimestamps: [NOW - 60_000] },
         );
 
-        const hackathonBlocked = evaluateGraduationGate(
+        const relaxedBlocked = evaluateGraduationGate(
             makeCell(),
-            'hackathon',
+            'relaxed',
             makeFeed('WORKING'),
             'balanced',
             { now: NOW, graduatedAtTimestamps: [NOW - 60_000, NOW - 120_000] },
@@ -138,7 +138,7 @@ describe('graduation gate policy matrix', () => {
 
         expect(strictBlocked.eligible).toBe(false);
         expect(strictBlocked.checks.weeklySlot).toBe(false);
-        expect(hackathonAllowed.eligible).toBe(true);
-        expect(hackathonBlocked.eligible).toBe(false);
+        expect(relaxedAllowed.eligible).toBe(true);
+        expect(relaxedBlocked.eligible).toBe(false);
     });
 });

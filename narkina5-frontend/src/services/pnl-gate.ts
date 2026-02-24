@@ -9,7 +9,7 @@ import { isMarketFeedReliable } from './pnl-market';
 import type { TradingCell } from './pnl-types';
 import type { FeedReliabilityMode, MarketFeedHealth } from './pnl-market';
 
-export type GraduationGateProfile = 'strict' | 'hackathon';
+export type GraduationGateProfile = 'strict' | 'relaxed';
 
 interface GateProfileConfig {
     minPnlSOL: number;
@@ -38,7 +38,7 @@ const GATE_PROFILE_CONFIG: Record<GraduationGateProfile, GateProfileConfig> = {
         maxRiskViolations: 0,
         maxWeeklyGraduations: GRAD_MAX_WEEKLY,
     },
-    hackathon: {
+    relaxed: {
         minPnlSOL: 6,
         relaxedMinPnlSOL: 5,
         maxDrawdownPercent: 22,
