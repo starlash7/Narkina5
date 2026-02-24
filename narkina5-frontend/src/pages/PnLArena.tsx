@@ -52,6 +52,7 @@ import {
     getPumpfunUrl,
     saveGraduatedAgent,
 } from '../services/pumpfun';
+import { resolveLaunchActionState } from '../services/pnl-launch-policy';
 import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } from '../components/Icons';
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
@@ -720,6 +721,13 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     const winnerCell = comp.winner ? comp.cells.find(d => d.id === comp.winner) : null;
     const feedHealth = getMarketFeedHealth();
     const winnerGate = winnerCell ? evaluateGraduationGate(winnerCell, gateProfile, feedHealth, feedReliabilityMode) : null;
+    const launchActionState = winnerGate
+        ? resolveLaunchActionState({
+            gateEligible: winnerGate.eligible,
+            launchSafetyLocked,
+            authenticated,
+        })
+        : null;
     const winnerTrustScore = winnerCell && winnerGate ? computeCellTrustScore(winnerCell, winnerGate) : null;
     const currentFloor = getFloorFromRound(comp.currentRound, comp.status === 'complete');
     const eliminationCount = ELIMINATION_SCHEDULE[comp.currentRound] ?? 0;
@@ -1056,7 +1064,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             Safety Lock: {launchSafetyLocked ? 'LOCKED (launch blocked)' : 'UNLOCKED'}
                         </div>
                     )}
-                    {gradStatus === 'idle' && authenticated && winnerGate?.eligible && !launchSafetyLocked && (
+                    {gradStatus === 'idle' && launchActionState === 'ready' && (
                         <button onClick={() => handleGraduate(winnerCell)} style={{
                             background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
@@ -1064,7 +1072,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             Graduate to Pump.fun
                         </button>
                     )}
-                    {gradStatus === 'idle' && authenticated && winnerGate?.eligible && launchSafetyLocked && (
+                    {gradStatus === 'idle' && authenticated && launchActionState === 'blocked_by_lock' && (
                         <button disabled style={{
                             background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'not-allowed',
@@ -1072,7 +1080,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             Unlock Safety Lock to Launch
                         </button>
                     )}
-                    {gradStatus === 'idle' && authenticated && winnerGate && !winnerGate.eligible && (
+                    {gradStatus === 'idle' && authenticated && launchActionState === 'blocked_by_gate' && (
                         <button disabled style={{
                             background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'not-allowed',
@@ -1080,7 +1088,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             Graduation Blocked
                         </button>
                     )}
-                    {gradStatus === 'idle' && !authenticated && winnerGate?.eligible && !launchSafetyLocked && (
+                    {gradStatus === 'idle' && launchActionState === 'needs_wallet' && (
                         <button onClick={login} style={{
                             background: '#ff6b35', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', cursor: 'pointer',
@@ -1088,12 +1096,12 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             Connect Wallet to Graduate
                         </button>
                     )}
-                    {gradStatus === 'idle' && !authenticated && winnerGate?.eligible && launchSafetyLocked && (
+                    {gradStatus === 'idle' && !authenticated && launchActionState === 'blocked_by_lock' && (
                         <div style={{ color: '#fca5a5', fontSize: '0.8rem' }}>
                             Unlock safety lock first, then connect wallet.
                         </div>
                     )}
-                    {gradStatus === 'idle' && !authenticated && winnerGate && !winnerGate.eligible && (
+                    {gradStatus === 'idle' && !authenticated && launchActionState === 'blocked_by_gate' && (
                         <div style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
                             Gate conditions are not met this season.
                         </div>
