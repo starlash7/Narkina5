@@ -59,6 +59,13 @@ Live operator controls:
 - `Feed Reliability Mode`: `balanced` (blocks only `FAILING`) or `strict` (requires `WORKING`).
 - `Launch Safety Lock`: default `LOCKED`; must be manually unlocked before launch.
 
+### Recommended Operating Presets
+
+| Preset | Gate Profile | Feed Reliability | Safety Lock | When to use |
+|---|---|---|---|---|
+| `Hackathon Demo` | `hackathon` | `balanced` | `LOCKED` by default, unlock only right before signature | Live judge demos and short submission videos |
+| `Production Safe` | `strict` | `strict` | `LOCKED` by default, unlock per approved launch window | Real operations with reputation/risk protection |
+
 ![Narkina5 Graduation Workflow](narkina5-frontend/src/assets/narkina5-workflow-excalidraw.svg)
 
 ## Architecture (Production Topology)
