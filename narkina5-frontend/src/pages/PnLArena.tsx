@@ -53,6 +53,8 @@ import {
     saveGraduatedAgent,
 } from '../services/pumpfun';
 import { resolveLaunchActionState } from '../services/pnl-launch-policy';
+import { OPERATOR_PRESETS } from '../services/pnl-operator-preset';
+import type { OperatorPreset } from '../services/pnl-operator-preset';
 import { TrendUpIcon, TrendDownIcon, DollarIcon, TradeIcon, ExternalLinkIcon } from '../components/Icons';
 
 type GradStatus = 'idle' | 'uploading' | 'building' | 'signing' | 'confirming' | 'success' | 'error';
@@ -122,6 +124,14 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
     const [gateProfile, setGateProfile] = useState<GraduationGateProfile>('hackathon');
     const [feedReliabilityMode, setFeedReliabilityMode] = useState<FeedReliabilityMode>('balanced');
     const [launchSafetyLocked, setLaunchSafetyLocked] = useState(true);
+    const applyOperatorPreset = useCallback((preset: OperatorPreset) => {
+        const config = OPERATOR_PRESETS[preset];
+        setGateProfile(config.gateProfile);
+        setFeedReliabilityMode(config.feedReliabilityMode);
+        setLaunchSafetyLocked(config.launchSafetyLocked);
+        setGradStatus('idle');
+        setGradError(null);
+    }, []);
 
     const logRef = useRef<HTMLDivElement>(null);
     const autoPlayRef = useRef(autoPlay);
@@ -892,6 +902,41 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                 gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                 gap: '0.7rem',
             }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ color: '#9ca3af', fontSize: '0.68rem', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Operator Preset
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => applyOperatorPreset('hackathon_demo')}
+                            style={{
+                                background: 'rgba(255,107,53,0.12)',
+                                color: '#ff6b35',
+                                border: '1px solid rgba(255,107,53,0.35)',
+                                borderRadius: 6,
+                                padding: '0.35rem 0.6rem',
+                                fontSize: '0.74rem',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Apply Hackathon Demo
+                        </button>
+                        <button
+                            onClick={() => applyOperatorPreset('production_safe')}
+                            style={{
+                                background: 'rgba(37,99,235,0.12)',
+                                color: '#93c5fd',
+                                border: '1px solid rgba(37,99,235,0.35)',
+                                borderRadius: 6,
+                                padding: '0.35rem 0.6rem',
+                                fontSize: '0.74rem',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Apply Production Safe
+                        </button>
+                    </div>
+                </div>
                 <div>
                     <div style={{ color: '#9ca3af', fontSize: '0.68rem', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                         Gate Profile
