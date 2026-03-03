@@ -50,12 +50,189 @@ const MIN_NET_EDGE_BUFFER_BPS = 12;
 const BASE_SLIPPAGE_BPS = SLIPPAGE_PERCENT * 10000;
 const MIN_TURNOVER_RATIO = 0.03;
 
+type CellArchetype =
+    | 'TrendRider'
+    | 'MeanReverter'
+    | 'BreakoutHunter'
+    | 'LiquidityFarmer'
+    | 'ShieldWall';
+
+interface CellStrategyProfile {
+    archetype: CellArchetype;
+    styleLabel: string;
+    riskBias: number;
+    executionBias: number;
+    researchBias: number;
+    chartBias: number;
+    adaptationBias: number;
+    momentumBias: number;      // -1..1 (negative = contrarian)
+    turnoverBias: number;      // 0..1
+    volatilityTolerance: number; // 0..1
+    stopLossPct: number;
+    takeProfitPct: number;
+    baseBuyCount: number;
+    baseSpendPct: number;
+    maxSpendPct: number;
+    rotateFactor: number;      // 0..1
+}
+
+const CELL_STRATEGIES: CellStrategyProfile[] = [
+    {
+        archetype: 'TrendRider',
+        styleLabel: 'trend follow + pyramiding',
+        riskBias: 0.14,
+        executionBias: 0.08,
+        researchBias: 0.02,
+        chartBias: 0.1,
+        adaptationBias: 0.06,
+        momentumBias: 0.85,
+        turnoverBias: 0.72,
+        volatilityTolerance: 0.68,
+        stopLossPct: 8.5,
+        takeProfitPct: 18,
+        baseBuyCount: 2,
+        baseSpendPct: 0.03,
+        maxSpendPct: 0.12,
+        rotateFactor: 0.55,
+    },
+    {
+        archetype: 'MeanReverter',
+        styleLabel: 'contrarian snapback + risk trim',
+        riskBias: -0.08,
+        executionBias: -0.02,
+        researchBias: 0.12,
+        chartBias: 0.08,
+        adaptationBias: 0.07,
+        momentumBias: -0.7,
+        turnoverBias: 0.5,
+        volatilityTolerance: 0.44,
+        stopLossPct: 6.5,
+        takeProfitPct: 13.5,
+        baseBuyCount: 1,
+        baseSpendPct: 0.024,
+        maxSpendPct: 0.09,
+        rotateFactor: 0.72,
+    },
+    {
+        archetype: 'BreakoutHunter',
+        styleLabel: 'high conviction breakout',
+        riskBias: 0.2,
+        executionBias: 0.12,
+        researchBias: -0.02,
+        chartBias: 0.15,
+        adaptationBias: 0.04,
+        momentumBias: 0.95,
+        turnoverBias: 0.85,
+        volatilityTolerance: 0.78,
+        stopLossPct: 9.5,
+        takeProfitPct: 22,
+        baseBuyCount: 2,
+        baseSpendPct: 0.032,
+        maxSpendPct: 0.13,
+        rotateFactor: 0.46,
+    },
+    {
+        archetype: 'LiquidityFarmer',
+        styleLabel: 'flow rotation + low-friction execution',
+        riskBias: 0.06,
+        executionBias: 0.16,
+        researchBias: 0.04,
+        chartBias: 0.04,
+        adaptationBias: 0.08,
+        momentumBias: 0.45,
+        turnoverBias: 0.96,
+        volatilityTolerance: 0.62,
+        stopLossPct: 7.8,
+        takeProfitPct: 16.5,
+        baseBuyCount: 2,
+        baseSpendPct: 0.028,
+        maxSpendPct: 0.11,
+        rotateFactor: 0.67,
+    },
+    {
+        archetype: 'ShieldWall',
+        styleLabel: 'capital defense + consistency',
+        riskBias: -0.16,
+        executionBias: 0.02,
+        researchBias: 0.1,
+        chartBias: 0.02,
+        adaptationBias: 0.12,
+        momentumBias: -0.25,
+        turnoverBias: 0.58,
+        volatilityTolerance: 0.36,
+        stopLossPct: 5.8,
+        takeProfitPct: 11.5,
+        baseBuyCount: 1,
+        baseSpendPct: 0.02,
+        maxSpendPct: 0.08,
+        rotateFactor: 0.84,
+    },
+];
+
 function clamp(v: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, v));
 }
 
+function mean(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((s, v) => s + v, 0) / values.length;
+}
+
+function stdDev(values: number[]): number {
+    if (values.length === 0) return 0;
+    const avg = mean(values);
+    const variance = values.reduce((s, v) => s + (v - avg) ** 2, 0) / values.length;
+    return Math.sqrt(variance);
+}
+
 function turnoverRatio(token: PumpToken): number {
     return token.volume24h / Math.max(token.marketCapSOL, 1);
+}
+
+function strategyProfileForCell(cellIndex: number): CellStrategyProfile {
+    return CELL_STRATEGIES[cellIndex % CELL_STRATEGIES.length];
+}
+
+interface MarketRegime {
+    trend: number;        // -1..1
+    volatility: number;   // 0..1
+    breadth: number;      // -1..1
+    liquidity: number;    // 0..1
+}
+
+function detectMarketRegime(tokens: PumpToken[]): MarketRegime {
+    if (tokens.length === 0) {
+        return { trend: 0, volatility: 0, breadth: 0, liquidity: 0 };
+    }
+
+    const changes = tokens.map((t) => t.priceChange24h);
+    const upRatio = tokens.filter((t) => t.priceChange24h > 0).length / tokens.length;
+    const avgTurnover = mean(tokens.map((t) => turnoverRatio(t)));
+
+    return {
+        trend: clamp(mean(changes) / 18, -1, 1),
+        volatility: clamp(stdDev(changes) / 28, 0, 1),
+        breadth: clamp((upRatio - 0.5) * 2, -1, 1),
+        liquidity: clamp(avgTurnover / 0.18, 0, 1),
+    };
+}
+
+function regimeFitScore(token: PumpToken, strategy: CellStrategyProfile, regime: MarketRegime): number {
+    const tokenMomentum = clamp(token.priceChange24h / 35, -1, 1);
+    const turnover = clamp(turnoverRatio(token) / 0.18, 0, 1);
+    const momentumWeight = Math.abs(strategy.momentumBias);
+    const momentumSide = strategy.momentumBias >= 0 ? tokenMomentum : -tokenMomentum;
+    const trendSide = strategy.momentumBias >= 0 ? regime.trend : -regime.trend;
+    const breadthSupport = strategy.momentumBias >= 0 ? regime.breadth : -regime.breadth;
+    const volPenalty = Math.max(0, regime.volatility - strategy.volatilityTolerance) * 0.9;
+    const liquidityFit = (turnover - 0.5) * strategy.turnoverBias * 0.9
+        + (regime.liquidity - 0.5) * strategy.turnoverBias * 0.7;
+
+    return momentumSide * momentumWeight * 1.05
+        + trendSide * momentumWeight * 0.65
+        + breadthSupport * 0.35
+        + liquidityFit
+        - volPenalty;
 }
 
 function holderConcentrationRisk(token: PumpToken): number {
@@ -179,17 +356,22 @@ function doctrineByCell(cellIdx: number, slot: number): TradingDoctrine {
 function makeSkillProfile(cellIdx: number, slot: number, role: InvestmentRole) {
     const base = roleTuning(role);
     const doctrine = doctrineByCell(cellIdx, slot);
+    const strategy = strategyProfileForCell(cellIdx);
     const jitter = seededRandom((cellIdx + 1) * 97 + (slot + 1) * 31) - 0.5;
     const cellBias = seededRandom((cellIdx + 1) * 191) - 0.5;
 
     return {
         doctrine,
-        riskAppetite: clamp(base.risk + jitter * 0.18 + cellBias * 0.1, 0.12, 0.9),
-        execution: clamp(base.exec + jitter * 0.14, 0.2, 0.96),
-        researchDepth: clamp(base.research + jitter * 0.16, 0.2, 0.98),
-        chartSkill: clamp(base.chart + jitter * 0.16, 0.2, 0.98),
-        adaptation: clamp(base.adapt + jitter * 0.12, 0.2, 0.98),
-        edgeScore: clamp(0.88 + cellBias * 0.16 + jitter * 0.1, 0.45, 1.25),
+        riskAppetite: clamp(base.risk + jitter * 0.18 + cellBias * 0.1 + strategy.riskBias * 0.18, 0.1, 0.92),
+        execution: clamp(base.exec + jitter * 0.14 + strategy.executionBias * 0.18, 0.2, 0.97),
+        researchDepth: clamp(base.research + jitter * 0.16 + strategy.researchBias * 0.18, 0.2, 0.99),
+        chartSkill: clamp(base.chart + jitter * 0.16 + strategy.chartBias * 0.18, 0.2, 0.99),
+        adaptation: clamp(base.adapt + jitter * 0.12 + strategy.adaptationBias * 0.16, 0.2, 0.99),
+        edgeScore: clamp(
+            0.88 + cellBias * 0.16 + jitter * 0.1 + strategy.executionBias * 0.08 + strategy.researchBias * 0.06,
+            0.42,
+            1.32,
+        ),
     };
 }
 
@@ -484,6 +666,8 @@ export function simulateCellTrades(
 
     const decisions: TradeDecision[] = [];
     const seed = cell.cellIndex * 997 + round * 31;
+    const strategy = strategyProfileForCell(cell.cellIndex);
+    const regime = detectMarketRegime(tokens);
     const cellAgents = cell.agents.map((id) => agents[id]).filter((a): a is PnLAgent => !!a);
     const totalWeight = Math.max(1, cellAgents.length);
     const avgRisk = cellAgents.reduce((s, a) => s + a.skillProfile.riskAppetite, 0) / totalWeight;
@@ -493,6 +677,7 @@ export function simulateCellTrades(
     const avgAdapt = cellAgents.reduce((s, a) => s + a.skillProfile.adaptation, 0) / totalWeight;
     const avgConfidence = cellAgents.reduce((s, a) => s + a.learning.confidence, 0) / totalWeight;
     const congestionBps = priorityFeeProxyBps(round, cell.cellIndex);
+    const drawdownPenalty = clamp(cell.portfolio.maxDrawdown / 22, 0, 0.06);
 
     const scoredTokens = tokens
         .map((token) => {
@@ -501,62 +686,127 @@ export function simulateCellTrades(
                 const skillBoost = agent.skillProfile.chartSkill * 0.3 + agent.skillProfile.researchDepth * 0.25;
                 return score + doctrineWeighted + skillBoost;
             }, 0) / totalWeight;
+            const qPenalty = qualityPenalty(token);
+            const regimeBias = regimeFitScore(token, strategy, regime);
+            const blendedScore = weighted + regimeBias * 6.5 - qPenalty * 3.8;
 
-            return { token, score: weighted };
+            return { token, score: blendedScore, qPenalty, regimeBias };
         })
         .sort((a, b) => b.score - a.score);
 
-    const tradableTokens = scoredTokens.slice(0, 14);
-    const buyCount = avgExecution > 0.7 ? 2 : 1;
+    const tradableTokens = scoredTokens.slice(0, 16);
+    const buyCount = Math.max(
+        1,
+        Math.min(
+            3,
+            Math.round(
+                strategy.baseBuyCount
+                + (avgExecution > 0.78 ? 1 : 0)
+                + (strategy.momentumBias > 0.6 && regime.trend > 0.2 ? 1 : 0)
+                - (regime.volatility > 0.78 && strategy.volatilityTolerance < 0.55 ? 1 : 0),
+            ),
+        ),
+    );
     const used = new Set<string>();
 
     for (let i = 0; i < buyCount && i < tradableTokens.length; i++) {
-        const tokenIdx = Math.floor(seededRandom(seed + i * 13 + 7) * Math.min(6, tradableTokens.length));
+        const pickWindow = Math.min(8, tradableTokens.length);
+        const tokenIdx = Math.floor(seededRandom(seed + i * 13 + 7) * pickWindow);
         const candidate = tradableTokens[tokenIdx];
         const token = candidate.token;
         if (used.has(token.mint)) continue;
         used.add(token.mint);
-        const qPenalty = qualityPenalty(token);
+        const qPenalty = candidate.qPenalty;
         if (qPenalty > 0.83) continue;
 
         const spendPercent = clamp(
-            0.025 + avgRisk * 0.06 + avgConfidence * 0.02 + seededRandom(seed + i * 17 + 3) * 0.025,
-            0.02,
-            0.11,
+            strategy.baseSpendPct
+                + avgRisk * 0.045
+                + avgConfidence * 0.018
+                + strategy.riskBias * 0.02
+                + seededRandom(seed + i * 17 + 3) * 0.018
+                - drawdownPenalty,
+            0.015,
+            strategy.maxSpendPct,
         );
         const spendSOL = cell.portfolio.cashSOL * spendPercent;
-        const expectedBps = expectedEdgeBps(token, candidate.score, avgResearch, avgChart, avgAdapt) - qPenalty * 120;
+        const strategyEdgeBps = candidate.regimeBias * 36;
+        const expectedBps = expectedEdgeBps(token, candidate.score, avgResearch, avgChart, avgAdapt)
+            + strategyEdgeBps
+            - qPenalty * 110;
         const impactBps = estimatePriceImpactBps(token, spendSOL);
-        const congestionAdjBps = congestionBps * clamp(1.06 - avgExecution * 0.12, 0.78, 1.08);
+        const congestionAdjBps = congestionBps * clamp(
+            1.08 - (avgExecution + strategy.executionBias * 0.15) * 0.14,
+            0.72,
+            1.08,
+        );
         const totalCostBps = BASE_SLIPPAGE_BPS + impactBps + congestionAdjBps;
+        const extraBuffer = Math.max(0, regime.volatility - strategy.volatilityTolerance) * 14;
+        const netBufferBps = MIN_NET_EDGE_BUFFER_BPS + (1 - avgAdapt) * 6 + extraBuffer;
 
-        if (spendSOL > 0.1 && expectedBps > totalCostBps + MIN_NET_EDGE_BUFFER_BPS) {
+        if (spendSOL > 0.08 && expectedBps > totalCostBps + netBufferBps) {
             decisions.push({
                 side: 'buy',
                 mint: token.mint,
                 symbol: token.symbol,
                 amountSOL: spendSOL,
-                reasoning: `Composite buy ${token.symbol}: edge ${expectedBps.toFixed(1)}bps vs cost ${totalCostBps.toFixed(1)}bps`,
+                reasoning: `${strategy.archetype}/${strategy.styleLabel} buy ${token.symbol}: edge ${expectedBps.toFixed(1)}bps vs cost ${totalCostBps.toFixed(1)}bps`,
             });
         }
     }
 
-    // Maybe sell an eligible position (respect minimum hold)
-    const sellablePositions = cell.portfolio.positions.filter(
+    // Proactive exits: stop-loss, take-profit, and regime-aware rotation
+    const sellablePositions = cell.portfolio.positions
+        .filter(
         (pos) => round - (pos.entryRound ?? round) >= MIN_HOLD_ROUNDS,
-    );
-    const holdBias = clamp(0.84 - avgRisk * 0.2 - avgConfidence * 0.12 + avgResearch * 0.08 + avgAdapt * 0.04, 0.56, 0.9);
-    if (sellablePositions.length > 0 && seededRandom(seed + 99) > holdBias) {
-        const posIdx = Math.floor(seededRandom(seed + 101) * sellablePositions.length);
-        const pos = sellablePositions[posIdx];
-        const sellPercent = clamp(0.2 + (1 - avgConfidence) * 0.35 + seededRandom(seed + 103) * 0.2, 0.2, 0.7);
+    )
+        .sort((a, b) => (a.currentPrice - a.avgEntryPrice) / a.avgEntryPrice - (b.currentPrice - b.avgEntryPrice) / b.avgEntryPrice);
+
+    const maxSellActions = Math.max(1, Math.min(2, Math.round(1 + strategy.rotateFactor * 0.6)));
+    let sellActions = 0;
+
+    for (let i = 0; i < sellablePositions.length; i++) {
+        if (sellActions >= maxSellActions) break;
+        const pos = sellablePositions[i];
+        if (used.has(pos.tokenMint)) continue;
+
+        const pnlPct = pos.avgEntryPrice > 0 ? ((pos.currentPrice - pos.avgEntryPrice) / pos.avgEntryPrice) * 100 : 0;
+        const stopLossHit = pnlPct <= -strategy.stopLossPct;
+        const takeProfitHit = pnlPct >= strategy.takeProfitPct;
+        const regimeRiskOff = regime.trend < -0.2 && regime.volatility > strategy.volatilityTolerance + 0.15;
+        const rotateTrigger = seededRandom(seed + 91 + i * 17) > clamp(
+            0.92 - strategy.rotateFactor * 0.24 - avgAdapt * 0.08 + avgConfidence * 0.04,
+            0.56,
+            0.94,
+        );
+
+        if (!stopLossHit && !takeProfitHit && !regimeRiskOff && !rotateTrigger) continue;
+
+        const baseSellPercent = stopLossHit
+            ? 0.78
+            : takeProfitHit
+                ? 0.46
+                : regimeRiskOff
+                    ? 0.58
+                    : 0.28 + strategy.rotateFactor * 0.22;
+        const sellPercent = clamp(baseSellPercent + seededRandom(seed + 113 + i * 19) * 0.14, 0.2, 0.92);
+        const trigger = stopLossHit
+            ? 'stop-loss'
+            : takeProfitHit
+                ? 'take-profit'
+                : regimeRiskOff
+                    ? 'risk-off rotation'
+                    : 'rebalance';
+
         decisions.push({
             side: 'sell',
             mint: pos.tokenMint,
             symbol: pos.tokenSymbol,
             amountSOL: pos.quantity * pos.currentPrice * sellPercent,
-            reasoning: `Risk rebalance sell (${pos.tokenSymbol}): confidence/hold rule triggered`,
+            reasoning: `${strategy.archetype}/${strategy.styleLabel} sell ${pos.tokenSymbol}: ${trigger} (${pnlPct.toFixed(1)}%)`,
         });
+        sellActions += 1;
+        used.add(pos.tokenMint);
     }
 
     return decisions;
@@ -577,6 +827,8 @@ export function applyTrades(
     const prevPnL = cell.portfolio.totalPnL;
     const allTrades: Trade[] = [];
     const logs: PnLLogEntry[] = [];
+    const strategy = strategyProfileForCell(cell.cellIndex);
+    const regime = detectMarketRegime(tokens);
     const riskManagers = cell.agents
         .map((id) => agents[id])
         .filter((agent): agent is PnLAgent => !!agent && agent.investmentRole === 'RiskManager');
@@ -599,14 +851,22 @@ export function applyTrades(
         if (!token) continue;
         const qPenalty = qualityPenalty(token);
         const turnover = turnoverRatio(token);
-        const riskCutoff = clamp(0.87 - riskStrictness * 0.1, 0.75, 0.9);
-        if (decision.side === 'buy' && (qPenalty > riskCutoff || turnover < MIN_TURNOVER_RATIO * 0.9)) {
+        const riskCutoff = clamp(
+            0.87
+            - riskStrictness * 0.1
+            + strategy.volatilityTolerance * 0.04
+            - Math.max(0, regime.volatility - strategy.volatilityTolerance) * 0.06,
+            0.72,
+            0.91,
+        );
+        const minTurnover = MIN_TURNOVER_RATIO * clamp(0.82 + strategy.turnoverBias * 0.5, 0.76, 1.24);
+        if (decision.side === 'buy' && (qPenalty > riskCutoff || turnover < minTurnover)) {
             logs.push({
                 timestamp: Date.now(),
                 round: 0,
                 cellId: cell.id,
                 type: 'risk_alert',
-                message: `${cell.name} risk veto on $${decision.symbol} (quality ${(qPenalty * 100).toFixed(0)}%, turnover ${(turnover * 100).toFixed(1)}%)`,
+                message: `${cell.name} risk veto on $${decision.symbol} (${strategy.archetype}; quality ${(qPenalty * 100).toFixed(0)}%, turnover ${(turnover * 100).toFixed(1)}%)`,
             });
             continue;
         }
@@ -621,7 +881,7 @@ export function applyTrades(
                     round: 0,
                     cellId: cell.id,
                     type: 'trade',
-                    message: `${cell.name} BUY ${decision.amountSOL.toFixed(2)} SOL of $${decision.symbol}`,
+                    message: `${cell.name} BUY ${decision.amountSOL.toFixed(2)} SOL of $${decision.symbol} | ${decision.reasoning}`,
                 });
             }
         } else {
@@ -634,7 +894,7 @@ export function applyTrades(
                     round: 0,
                     cellId: cell.id,
                     type: 'trade',
-                    message: `${cell.name} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL`,
+                    message: `${cell.name} SELL $${decision.symbol} for ${result.trade.totalSOL.toFixed(2)} SOL | ${decision.reasoning}`,
                 });
             }
         }
