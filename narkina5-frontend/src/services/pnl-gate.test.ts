@@ -32,7 +32,7 @@ function makeCell(params?: {
 
     return {
         portfolio: {
-            totalPnL,
+            totalPnL: totalPnl,
             maxDrawdown: drawdown,
             totalValue,
             positions,
