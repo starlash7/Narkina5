@@ -49,6 +49,8 @@ const MAX_PRIORITY_FEE_BPS = 26;
 const MIN_NET_EDGE_BUFFER_BPS = 12;
 const BASE_SLIPPAGE_BPS = SLIPPAGE_PERCENT * 10000;
 const MIN_TURNOVER_RATIO = 0.03;
+const MAX_OPEN_POSITIONS = 6;
+const HARD_RISK_OFF_DRAWDOWN = 18;
 
 type CellArchetype =
     | 'TrendRider'
@@ -74,6 +76,15 @@ interface CellStrategyProfile {
     baseSpendPct: number;
     maxSpendPct: number;
     rotateFactor: number;      // 0..1
+}
+
+type FloorPhase = 'boot' | 'expansion' | 'survival';
+
+interface CellBehaviorProfile {
+    discipline: number;  // risk control strictness
+    aggression: number;  // willingness to size up
+    patience: number;    // hold vs churn
+    innovation: number;  // appetite for non-consensus setups
 }
 
 const CELL_STRATEGIES: CellStrategyProfile[] = [
@@ -183,6 +194,40 @@ function stdDev(values: number[]): number {
     const avg = mean(values);
     const variance = values.reduce((s, v) => s + (v - avg) ** 2, 0) / values.length;
     return Math.sqrt(variance);
+}
+
+function tradingPhaseByRound(round: number): FloorPhase {
+    if (round <= 2) return 'boot';
+    if (round <= 5) return 'expansion';
+    return 'survival';
+}
+
+function behaviorProfileForCell(cellIndex: number): CellBehaviorProfile {
+    const seed = cellIndex + 1;
+    const discipline = clamp(0.45 + seededRandom(seed * 149) * 0.45, 0.35, 0.92);
+    const aggression = clamp(0.35 + seededRandom(seed * 211 + 9) * 0.5, 0.2, 0.94);
+    const patience = clamp(0.3 + seededRandom(seed * 263 + 5) * 0.58, 0.2, 0.95);
+    const innovation = clamp(0.28 + seededRandom(seed * 307 + 11) * 0.62, 0.18, 0.96);
+    return { discipline, aggression, patience, innovation };
+}
+
+function recentPnLDeltaTrend(roundPnl: number[]): number {
+    if (roundPnl.length < 2) return 0;
+    const start = Math.max(1, roundPnl.length - 4);
+    const deltas: number[] = [];
+    for (let i = start; i < roundPnl.length; i++) {
+        deltas.push(roundPnl[i] - roundPnl[i - 1]);
+    }
+    return clamp(mean(deltas) / 3.5, -1, 1);
+}
+
+function maxPositionConcentration(cell: TradingCell): number {
+    const total = Math.max(1e-6, cell.portfolio.totalValue);
+    const maxPositionValue = cell.portfolio.positions.reduce(
+        (max, pos) => Math.max(max, pos.currentPrice * pos.quantity),
+        0,
+    );
+    return clamp(maxPositionValue / total, 0, 1);
 }
 
 function turnoverRatio(token: PumpToken): number {
@@ -667,7 +712,10 @@ export function simulateCellTrades(
     const decisions: TradeDecision[] = [];
     const seed = cell.cellIndex * 997 + round * 31;
     const strategy = strategyProfileForCell(cell.cellIndex);
+    const behavior = behaviorProfileForCell(cell.cellIndex);
+    const phase = tradingPhaseByRound(round);
     const regime = detectMarketRegime(tokens);
+    const recentTrend = recentPnLDeltaTrend(cell.roundPnL);
     const cellAgents = cell.agents.map((id) => agents[id]).filter((a): a is PnLAgent => !!a);
     const totalWeight = Math.max(1, cellAgents.length);
     const avgRisk = cellAgents.reduce((s, a) => s + a.skillProfile.riskAppetite, 0) / totalWeight;
@@ -678,6 +726,16 @@ export function simulateCellTrades(
     const avgConfidence = cellAgents.reduce((s, a) => s + a.learning.confidence, 0) / totalWeight;
     const congestionBps = priorityFeeProxyBps(round, cell.cellIndex);
     const drawdownPenalty = clamp(cell.portfolio.maxDrawdown / 22, 0, 0.06);
+    const concentrationNow = maxPositionConcentration(cell);
+    const softPositionCap = clamp(
+        MAX_OPEN_POSITIONS
+        + (phase === 'boot' ? -1 : 0)
+        + (phase === 'survival' ? -1 : 0)
+        + (behavior.innovation > 0.7 ? 1 : 0)
+        - (concentrationNow > 0.48 ? 1 : 0),
+        3,
+        7,
+    );
 
     const scoredTokens = tokens
         .map((token) => {
@@ -703,11 +761,15 @@ export function simulateCellTrades(
                 strategy.baseBuyCount
                 + (avgExecution > 0.78 ? 1 : 0)
                 + (strategy.momentumBias > 0.6 && regime.trend > 0.2 ? 1 : 0)
+                + (phase === 'expansion' && behavior.aggression > 0.6 ? 1 : 0)
+                + (phase === 'survival' && recentTrend < -0.15 ? -1 : 0)
                 - (regime.volatility > 0.78 && strategy.volatilityTolerance < 0.55 ? 1 : 0),
             ),
         ),
     );
     const used = new Set<string>();
+    const heldMints = new Set(cell.portfolio.positions.map((p) => p.tokenMint));
+    let plannedNewPositions = 0;
 
     for (let i = 0; i < buyCount && i < tradableTokens.length; i++) {
         const pickWindow = Math.min(8, tradableTokens.length);
@@ -716,6 +778,9 @@ export function simulateCellTrades(
         const token = candidate.token;
         if (used.has(token.mint)) continue;
         used.add(token.mint);
+        const isExistingPosition = heldMints.has(token.mint);
+        const projectedOpenPositions = cell.portfolio.positions.length + plannedNewPositions + (isExistingPosition ? 0 : 1);
+        if (!isExistingPosition && projectedOpenPositions > softPositionCap) continue;
         const qPenalty = candidate.qPenalty;
         if (qPenalty > 0.83) continue;
 
@@ -724,6 +789,8 @@ export function simulateCellTrades(
                 + avgRisk * 0.045
                 + avgConfidence * 0.018
                 + strategy.riskBias * 0.02
+                + recentTrend * 0.012
+                + (phase === 'survival' ? -behavior.discipline * 0.008 : behavior.aggression * 0.006)
                 + seededRandom(seed + i * 17 + 3) * 0.018
                 - drawdownPenalty,
             0.015,
@@ -742,7 +809,8 @@ export function simulateCellTrades(
         );
         const totalCostBps = BASE_SLIPPAGE_BPS + impactBps + congestionAdjBps;
         const extraBuffer = Math.max(0, regime.volatility - strategy.volatilityTolerance) * 14;
-        const netBufferBps = MIN_NET_EDGE_BUFFER_BPS + (1 - avgAdapt) * 6 + extraBuffer;
+        const concentrationBuffer = concentrationNow > 0.5 ? (concentrationNow - 0.5) * 70 : 0;
+        const netBufferBps = MIN_NET_EDGE_BUFFER_BPS + (1 - avgAdapt) * 6 + extraBuffer + concentrationBuffer;
 
         if (spendSOL > 0.08 && expectedBps > totalCostBps + netBufferBps) {
             decisions.push({
@@ -752,6 +820,9 @@ export function simulateCellTrades(
                 amountSOL: spendSOL,
                 reasoning: `${strategy.archetype}/${strategy.styleLabel} buy ${token.symbol}: edge ${expectedBps.toFixed(1)}bps vs cost ${totalCostBps.toFixed(1)}bps`,
             });
+            if (!isExistingPosition) {
+                plannedNewPositions += 1;
+            }
         }
     }
 
@@ -762,8 +833,10 @@ export function simulateCellTrades(
     )
         .sort((a, b) => (a.currentPrice - a.avgEntryPrice) / a.avgEntryPrice - (b.currentPrice - b.avgEntryPrice) / b.avgEntryPrice);
 
-    const maxSellActions = Math.max(1, Math.min(2, Math.round(1 + strategy.rotateFactor * 0.6)));
+    const maxSellActions = Math.max(1, Math.min(2, Math.round(1 + strategy.rotateFactor * 0.6 + (phase === 'survival' ? 0.4 : 0))));
     let sellActions = 0;
+    const hardRiskOff = cell.portfolio.maxDrawdown >= HARD_RISK_OFF_DRAWDOWN
+        || (phase === 'survival' && regime.volatility > 0.82);
 
     for (let i = 0; i < sellablePositions.length; i++) {
         if (sellActions >= maxSellActions) break;
@@ -773,10 +846,10 @@ export function simulateCellTrades(
         const pnlPct = pos.avgEntryPrice > 0 ? ((pos.currentPrice - pos.avgEntryPrice) / pos.avgEntryPrice) * 100 : 0;
         const stopLossHit = pnlPct <= -strategy.stopLossPct;
         const takeProfitHit = pnlPct >= strategy.takeProfitPct;
-        const regimeRiskOff = regime.trend < -0.2 && regime.volatility > strategy.volatilityTolerance + 0.15;
+        const regimeRiskOff = hardRiskOff || (regime.trend < -0.2 && regime.volatility > strategy.volatilityTolerance + 0.15);
         const rotateTrigger = seededRandom(seed + 91 + i * 17) > clamp(
-            0.92 - strategy.rotateFactor * 0.24 - avgAdapt * 0.08 + avgConfidence * 0.04,
-            0.56,
+            0.92 - strategy.rotateFactor * 0.24 - avgAdapt * 0.08 + avgConfidence * 0.04 + behavior.patience * 0.06,
+            0.52,
             0.94,
         );
 
@@ -807,6 +880,18 @@ export function simulateCellTrades(
         });
         sellActions += 1;
         used.add(pos.tokenMint);
+    }
+
+    if (hardRiskOff && sellActions === 0 && sellablePositions.length > 0) {
+        const forced = sellablePositions[sellablePositions.length - 1];
+        const forcedPercent = clamp(0.32 + behavior.discipline * 0.26, 0.3, 0.75);
+        decisions.push({
+            side: 'sell',
+            mint: forced.tokenMint,
+            symbol: forced.tokenSymbol,
+            amountSOL: forced.quantity * forced.currentPrice * forcedPercent,
+            reasoning: `${strategy.archetype}/${strategy.styleLabel} sell ${forced.tokenSymbol}: hard risk-off defense`,
+        });
     }
 
     return decisions;
@@ -911,17 +996,31 @@ export function applyTrades(
             const recentAvg = recent.reduce((s, v) => s + v, 0) / Math.max(1, recent.length);
             const lr = 0.06 + agent.skillProfile.adaptation * 0.18;
             const direction = recentAvg >= 0 ? 1 : -1;
+            const stress = clamp(portfolio.maxDrawdown / 22, 0, 1);
 
             agent.learning.rounds += 1;
             agent.learning.cumulativePnL += perAgentDelta;
             agent.learning.recentRoundPnL = recent;
-            agent.learning.confidence = clamp(agent.learning.confidence + direction * lr * 0.08, 0.1, 0.95);
+            agent.learning.confidence = clamp(
+                agent.learning.confidence + direction * lr * 0.08 - stress * lr * 0.05,
+                0.08,
+                0.95,
+            );
 
             agent.skillProfile.edgeScore = clamp(agent.skillProfile.edgeScore + direction * lr * 0.05, 0.35, 1.8);
-            agent.skillProfile.riskAppetite = clamp(agent.skillProfile.riskAppetite + direction * lr * 0.03, 0.1, 0.9);
+            agent.skillProfile.riskAppetite = clamp(
+                agent.skillProfile.riskAppetite + direction * lr * 0.03 - stress * lr * 0.04,
+                0.08,
+                0.9,
+            );
             agent.skillProfile.execution = clamp(agent.skillProfile.execution + direction * lr * 0.015, 0.2, 0.99);
             agent.skillProfile.researchDepth = clamp(agent.skillProfile.researchDepth + direction * lr * 0.012, 0.2, 0.99);
             agent.skillProfile.chartSkill = clamp(agent.skillProfile.chartSkill + direction * lr * 0.012, 0.2, 0.99);
+            agent.skillProfile.adaptation = clamp(
+                agent.skillProfile.adaptation + direction * lr * 0.006 + stress * lr * 0.004,
+                0.2,
+                0.99,
+            );
         }
     }
 
