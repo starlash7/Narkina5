@@ -177,6 +177,29 @@ Every agent carries a skill vector (`riskAppetite`, `execution`, `researchDepth`
   - liquidity/turnover quality thresholds
 - Skill profiles and confidence adapt every round based on realized cell delta
 
+### Strategy Diversification Upgrade (2026-03-03)
+
+Goal: increase graduation probability by improving team strategy quality, not by lowering gate cutlines.
+
+Direction:
+- Keep graduation gate thresholds intact and raise pass likelihood through stronger cell behavior.
+- Make each cell operate with a distinct strategic identity (not small random variation).
+- Add market-regime response so cells adapt between trend, volatility, and risk-off states.
+- Improve survival consistency with proactive exits and concentration control.
+
+Implemented:
+- Added fixed cell archetypes: `TrendRider`, `MeanReverter`, `BreakoutHunter`, `LiquidityFarmer`, `ShieldWall`.
+- Added per-cell behavior traits: `discipline`, `aggression`, `patience`, `innovation`.
+- Added floor phase policy: `boot` / `expansion` / `survival` with phase-dependent sizing and turnover.
+- Added market regime detection and archetype-regime fit scoring in trade selection.
+- Added dynamic position-count cap and concentration-aware entry buffer.
+- Added proactive sell triggers: `stop-loss`, `take-profit`, `risk-off rotation`, `hard risk-off defense`.
+- Upgraded learning loop to include drawdown stress in confidence/risk/adaptation updates.
+
+Current status:
+- Engine logic upgraded in `narkina5-frontend/src/services/pnl-competition.ts`.
+- Gate policy remains unchanged (no threshold relaxation in this iteration).
+
 ### Graduation Gate Policy
 
 Champion cells do not auto-launch. They pass all gates:
