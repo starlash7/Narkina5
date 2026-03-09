@@ -11,6 +11,8 @@ Instead of launching first and evaluating later, we run a full elimination arena
 - Product: [narkina5.vercel.app](https://narkina5.vercel.app)
 - Arena: [narkina5.vercel.app/pnl-arena](https://narkina5.vercel.app/pnl-arena)
 - Repository: [github.com/starlash7/Narkina5](https://github.com/starlash7/Narkina5)
+- Engineering plan: [`plan.md`](plan.md)
+- Priority backlog: [`TODOS.md`](TODOS.md)
 
 ## TL;DR
 

@@ -4,6 +4,27 @@ const PROJECT_X_URL = import.meta.env.VITE_PROJECT_X_URL || 'https://x.com/Narki
 const PROJECT_WEBSITE_URL = import.meta.env.VITE_PROJECT_WEBSITE_URL || 'https://narkina5.vercel.app';
 
 // ── Types ──────────────────────────────────────────────
+export type PumpfunAction = 'ipfs' | 'trade';
+export type PumpfunErrorCode =
+    | 'PFN_METHOD_NOT_ALLOWED'
+    | 'PFN_VALIDATION_IPFS_REQUIRED_FIELDS'
+    | 'PFN_PROVIDER_IPFS_FAILED'
+    | 'PFN_PROVIDER_TRADE_FAILED'
+    | 'PFN_BAD_ACTION'
+    | 'PFN_NETWORK_ERROR'
+    | 'PFN_INTERNAL'
+    | 'PFN_RESPONSE_PARSE'
+    | 'PFN_UNKNOWN';
+
+interface PumpfunErrorPayload {
+    error?: string;
+    code?: string;
+    retryable?: boolean;
+    action?: PumpfunAction;
+    providerStatus?: number;
+    details?: string;
+}
+
 export interface AgentGraduationData {
     name: string;
     symbol: string;
@@ -16,6 +37,81 @@ export interface GraduationResult {
     signature: string;
     mintAddress: string;
     pumpfunUrl: string;
+}
+
+export class PumpfunError extends Error {
+    code: PumpfunErrorCode;
+    action: PumpfunAction;
+    status: number;
+    retryable: boolean;
+    providerStatus?: number;
+    details?: string;
+
+    constructor(params: {
+        message: string;
+        code: PumpfunErrorCode;
+        action: PumpfunAction;
+        status: number;
+        retryable: boolean;
+        providerStatus?: number;
+        details?: string;
+    }) {
+        super(params.message);
+        this.name = 'PumpfunError';
+        this.code = params.code;
+        this.action = params.action;
+        this.status = params.status;
+        this.retryable = params.retryable;
+        this.providerStatus = params.providerStatus;
+        this.details = params.details;
+    }
+}
+
+function mapCode(input?: string): PumpfunErrorCode {
+    switch (input) {
+        case 'PFN_METHOD_NOT_ALLOWED':
+        case 'PFN_VALIDATION_IPFS_REQUIRED_FIELDS':
+        case 'PFN_PROVIDER_IPFS_FAILED':
+        case 'PFN_PROVIDER_TRADE_FAILED':
+        case 'PFN_BAD_ACTION':
+        case 'PFN_NETWORK_ERROR':
+        case 'PFN_INTERNAL':
+        case 'PFN_RESPONSE_PARSE':
+            return input;
+        default:
+            return 'PFN_UNKNOWN';
+    }
+}
+
+function defaultRetryable(status: number): boolean {
+    return status === 408 || status === 429 || status >= 500;
+}
+
+async function buildPumpfunError(
+    response: Response,
+    action: PumpfunAction,
+): Promise<PumpfunError> {
+    let payload: PumpfunErrorPayload | null = null;
+
+    try {
+        payload = await response.json();
+    } catch {
+        payload = null;
+    }
+
+    const code = mapCode(payload?.code);
+    const messageCore = payload?.error || response.statusText || 'Pumpfun request failed';
+    const message = `[${code}] ${messageCore}`;
+
+    return new PumpfunError({
+        message,
+        code,
+        action,
+        status: response.status,
+        retryable: payload?.retryable ?? defaultRetryable(response.status),
+        providerStatus: payload?.providerStatus,
+        details: payload?.details,
+    });
 }
 
 // ── Token Metadata ─────────────────────────────────────
@@ -95,10 +191,32 @@ export async function uploadMetadata(
     });
 
     if (!response.ok) {
-        throw new Error(`Metadata upload failed: ${response.statusText}`);
+        throw await buildPumpfunError(response, 'ipfs');
     }
 
-    const data = await response.json();
+    let data: { metadataUri?: string };
+    try {
+        data = await response.json();
+    } catch {
+        throw new PumpfunError({
+            message: '[PFN_RESPONSE_PARSE] Metadata upload response parse failed',
+            code: 'PFN_RESPONSE_PARSE',
+            action: 'ipfs',
+            status: response.status,
+            retryable: false,
+        });
+    }
+
+    if (!data.metadataUri) {
+        throw new PumpfunError({
+            message: '[PFN_RESPONSE_PARSE] Missing metadataUri in IPFS response',
+            code: 'PFN_RESPONSE_PARSE',
+            action: 'ipfs',
+            status: response.status,
+            retryable: false,
+        });
+    }
+
     return data.metadataUri;
 }
 
@@ -137,10 +255,20 @@ export async function buildCreateTokenTx(
     });
 
     if (!response.ok) {
-        throw new Error(`PumpPortal API error: ${response.statusText}`);
+        throw await buildPumpfunError(response, 'trade');
     }
 
-    return new Uint8Array(await response.arrayBuffer());
+    try {
+        return new Uint8Array(await response.arrayBuffer());
+    } catch {
+        throw new PumpfunError({
+            message: '[PFN_RESPONSE_PARSE] Trade tx bytes parse failed',
+            code: 'PFN_RESPONSE_PARSE',
+            action: 'trade',
+            status: response.status,
+            retryable: false,
+        });
+    }
 }
 
 // ── Sign with Mint Keypair ─────────────────────────────
