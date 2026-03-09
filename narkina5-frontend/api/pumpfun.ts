@@ -1,8 +1,35 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+type ProxyAction = 'ipfs' | 'trade';
+
+interface ProxyErrorPayload {
+    error: string;
+    code: string;
+    retryable: boolean;
+    action?: ProxyAction;
+    providerStatus?: number;
+    details?: string;
+}
+
+function sendError(
+    res: VercelResponse,
+    status: number,
+    payload: ProxyErrorPayload,
+) {
+    return res.status(status).json(payload);
+}
+
+function isRetryableStatus(status: number): boolean {
+    return status === 408 || status === 429 || status >= 500;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return sendError(res, 405, {
+            error: 'Method not allowed',
+            code: 'PFN_METHOD_NOT_ALLOWED',
+            retryable: false,
+        });
     }
 
     const action = req.query.action as string;
@@ -13,7 +40,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { file, fileName, name, symbol, description, twitter, website, showName } = req.body;
 
             if (!file || !name || !symbol) {
-                return res.status(400).json({ error: 'Missing required fields: file, name, symbol' });
+                return sendError(res, 400, {
+                    error: 'Missing required fields: file, name, symbol',
+                    code: 'PFN_VALIDATION_IPFS_REQUIRED_FIELDS',
+                    retryable: false,
+                    action: 'ipfs',
+                });
             }
 
             // Reconstruct FormData from base64 JSON
@@ -38,7 +70,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!response.ok) {
                 const text = await response.text();
                 console.error('Pump.fun IPFS error:', text);
-                return res.status(response.status).json({ error: 'IPFS upload failed' });
+                return sendError(res, response.status, {
+                    error: 'IPFS upload failed',
+                    code: 'PFN_PROVIDER_IPFS_FAILED',
+                    retryable: isRetryableStatus(response.status),
+                    action: 'ipfs',
+                    providerStatus: response.status,
+                    details: text.slice(0, 280),
+                });
             }
 
             const data = await response.json();
@@ -55,7 +94,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!response.ok) {
                 const text = await response.text();
                 console.error('PumpPortal error:', text);
-                return res.status(response.status).json({ error: 'Trade API failed' });
+                return sendError(res, response.status, {
+                    error: 'Trade API failed',
+                    code: 'PFN_PROVIDER_TRADE_FAILED',
+                    retryable: isRetryableStatus(response.status),
+                    action: 'trade',
+                    providerStatus: response.status,
+                    details: text.slice(0, 280),
+                });
             }
 
             const data = Buffer.from(await response.arrayBuffer());
@@ -63,10 +109,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).send(data);
 
         } else {
-            return res.status(400).json({ error: 'Invalid action. Use ?action=ipfs or ?action=trade' });
+            return sendError(res, 400, {
+                error: 'Invalid action. Use ?action=ipfs or ?action=trade',
+                code: 'PFN_BAD_ACTION',
+                retryable: false,
+            });
         }
     } catch (err) {
         console.error('Pumpfun proxy error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        const isNetworkLike = err instanceof TypeError;
+        return sendError(res, 500, {
+            error: 'Internal server error',
+            code: isNetworkLike ? 'PFN_NETWORK_ERROR' : 'PFN_INTERNAL',
+            retryable: isNetworkLike,
+            details: err instanceof Error ? err.message.slice(0, 280) : 'unknown',
+        });
     }
 }
