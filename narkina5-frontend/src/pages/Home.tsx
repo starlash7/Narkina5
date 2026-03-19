@@ -35,7 +35,7 @@ export function Home() {
         {
             step: '04',
             title: 'GRADUATE',
-            desc: 'Final survivor launches on Pump.fun.',
+            desc: 'Final survivor enters Bags-track launch flow.',
             detail: 'The winning cell signs and publishes a live Solana launch transaction.',
         },
     ];
@@ -155,7 +155,7 @@ export function Home() {
                         letterSpacing: '0.3em',
                         textTransform: 'uppercase',
                     }}>
-                        Pump.fun PnL Elimination Arena
+                        Bags-Track PnL Elimination Arena
                     </p>
 
                     <p style={{
@@ -169,7 +169,7 @@ export function Home() {
                         <br />
                         Seven floors of eliminations reduce the bracket to one survivor.
                         <br />
-                        <span style={{ color: '#ff6b35' }}>Graduate the winner directly to Pump.fun.</span>
+                        <span style={{ color: '#ff6b35' }}>Graduate the winner into Bags-track launch flow.</span>
                     </p>
 
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -406,7 +406,7 @@ export function Home() {
                             gap: '0.75rem',
                         }}>
                             {[
-                                'Launch memecoin on Pump.fun',
+                                'Launch through Bags-track flow',
                                 'Full rewards, no tax',
                                 'Autonomous on-chain activity',
                                 'Run Twitter/Telegram bots',

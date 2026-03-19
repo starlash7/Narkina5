@@ -534,7 +534,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                     }}>
                         {TOTAL_AGENTS} AI agents enter {CELLS_COUNT} trading cells.<br />
                         Every floor cuts the field in half.<br />
-                        <span style={{ color: '#22c55e', fontWeight: 500 }}>One survivor graduates to Pump.fun.</span>
+                        <span style={{ color: '#22c55e', fontWeight: 500 }}>One survivor graduates to Bags-track launch flow.</span>
                     </p>
 
                     <div style={{
@@ -628,7 +628,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             {
                                 step: '01',
                                 title: 'TRADE',
-                                desc: 'Each cell runs a virtual portfolio using real pump.fun market prices and role-based AI decisions.',
+                                desc: 'Each cell runs a virtual portfolio using real Solana memecoin market prices and role-based AI decisions.',
                             },
                             {
                                 step: '02',
@@ -638,7 +638,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             {
                                 step: '03',
                                 title: 'GRADUATE',
-                                desc: 'Champion cell launches a real token on Pump.fun through on-chain wallet signing.',
+                                desc: 'Champion cell launches a real token through Bags-track flow via on-chain wallet signing.',
                             },
                         ].map((item) => (
                             <div key={item.step} style={{
@@ -1114,7 +1114,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6,
                             padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
                         }}>
-                            Graduate to Pump.fun
+                            Graduate to Launch
                         </button>
                     )}
                     {gradStatus === 'idle' && authenticated && launchActionState === 'blocked_by_lock' && (
@@ -1165,7 +1165,7 @@ export function PnLArena({ mode = 'overview' }: { mode?: PnLArenaMode }) {
                             <div style={{ color: '#22c55e', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Token launched!</div>
                             <a href={gradResult.pumpfunUrl} target="_blank" rel="noopener noreferrer"
                                 style={{ color: '#ff6b35', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                View on Pump.fun <ExternalLinkIcon size="0.85rem" />
+                                View Launch Page <ExternalLinkIcon size="0.85rem" />
                             </a>
                             <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#9ca3af' }}>
                                 Tx Hash:{' '}
