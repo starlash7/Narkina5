@@ -15,7 +15,7 @@ export function About() {
         {
             icon: <GlobeIcon />,
             title: 'Market Graduation',
-            desc: 'Winners launch on Pump.fun and move from simulation into open market reality.',
+            desc: 'Winners launch through Bags-track flow and move from simulation into open market reality.',
         },
     ];
 
@@ -38,7 +38,7 @@ export function About() {
         {
             step: '04',
             title: 'GRADUATE',
-            detail: 'Champion launches on Pump.fun through on-chain transaction signing.',
+            detail: 'Champion launches through Bags-track on-chain transaction signing flow.',
         },
     ];
 
@@ -48,7 +48,7 @@ export function About() {
         ['Wallet', 'Privy auth + signing'],
         ['AI', 'Claude-powered role decisions'],
         ['Market Data', 'DexScreener feed + local fallback'],
-        ['Launch', 'Pump.fun / PumpPortal flow'],
+        ['Launch', 'Bags-track objective / PumpPortal rail'],
     ];
 
     return (

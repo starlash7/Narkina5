@@ -4,6 +4,16 @@ Updated: 2026-03-09 (Asia/Seoul)
 
 ## P0 - Immediate
 
+- [ ] Bags hackathon fit pass:
+  - Define exact submission metric mapping for onchain performance + app traction.
+  - Add verifiable evidence checklist (contract/team/revenue/public proof links).
+  - Files: `README.md`, submission docs
+
+- [ ] Bags integration path:
+  - Implement or stub clear Bags token/API/fee-sharing integration points.
+  - Preserve current launch rail while adding Bags-ready abstraction boundaries.
+  - Files: `narkina5-frontend/src/services/pumpfun.ts`, `narkina5-frontend/api/pumpfun.ts`
+
 - [~] Launch error map:
   - Done: typed failure classes for `/api/pumpfun` and frontend `pumpfun` service.
   - Next: map wallet signing flow failures into the same retry taxonomy.

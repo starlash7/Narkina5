@@ -1,7 +1,7 @@
 # NARKINA 5
 
 > **64 Cells · 512 Agents · 7 Floors · 1 Survivor**  
-> **Autonomous launch-selection arena on Solana, graduating winners to Pump.fun**
+> **Autonomous launch-selection arena on Solana, graduating winners to Bags-track launch flow**
 
 Narkina5 is a tournament system for token launch selection.
 Instead of launching first and evaluating later, we run a full elimination arena and promote only the final survivor.
@@ -19,7 +19,7 @@ Instead of launching first and evaluating later, we run a full elimination arena
 - **Problem**: most meme launches optimize attention first and quality later.
 - **Solution**: Narkina5 runs a deterministic season tournament before launch.
 - **Mechanism**: 512 agents compete in 64 cells across a 7-floor season, cut by PnL each round.
-- **Result**: only the final survivor is promoted into Pump.fun graduation flow.
+- **Result**: only the final survivor is promoted into Bags-track graduation flow.
 
 ## Why This Feels New
 
@@ -29,14 +29,26 @@ Narkina5 treats launch selection as a **competitive systems problem**:
 - selection happens under identical market snapshots, not subjective scoring
 - graduation is wired to execution flow, not just a ranking screen
 
+## Bags Hackathon Objective (Q1 2026)
+
+Narkina5 is now optimized for Bags Hackathon evaluation priorities:
+
+- Real traction first: onchain performance + app usage growth
+- Verifiable shipping: deployed product, onchain evidence, auditable outputs
+- Deeper Bags alignment: project direction is set to Bags token/API/fee-sharing integration
+
+Current implementation note:
+- Launch rail is currently PumpPortal-based.
+- Product objective and roadmap are now Bags-first, with integration tasks prioritized in `TODOS.md`.
+
 ## Quick Walkthrough
 
 1. Open `Home` and enter `PnL Arena`
 2. Start bracket run and confirm floor schedule (`64 -> 32 -> 16 -> 8 -> 4 -> 2 -> 1`)
 3. Verify season loop: phase pipeline, PnL accounting, deterministic eliminations
-4. Confirm winner finalization and Pump.fun graduation path
+4. Confirm winner finalization and Bags-track graduation path
 
-## Graduation -> Pump.fun Launch Workflow (Current)
+## Graduation -> Launch Workflow (Bags-Track Objective)
 
 The launch path is already integrated end-to-end, with one explicit user approval step:
 
@@ -48,7 +60,7 @@ The launch path is already integrated end-to-end, with one explicit user approva
 6. Signed transaction is sent on Solana mainnet.
 7. UI returns proof artifacts in real-time:
    - mint address
-   - Pump.fun link
+   - launch page link
    - tx hash / explorer link
    - downloadable season receipt JSON
 
@@ -85,11 +97,11 @@ Live operator controls:
 │ - /api/market      (DexScreener proxy, response shaping)              │
 │ - /api/agent       (Claude role decision endpoint)                     │
 │ - /api/pnl-agent   (PnL-focused decision endpoint)                     │
-│ - /api/pumpfun     (PumpPortal/Pump.fun launch proxy)                 │
+│ - /api/pumpfun     (Launch proxy; current rail: PumpPortal, Bags objective) │
 └───────────────┬──────────────────────┬──────────────────────┬─────────┘
                 │                      │                      │
                 v                      v                      v
-           DexScreener API         Anthropic API       PumpPortal/Pump.fun
+           DexScreener API         Anthropic API       PumpPortal (current rail)
 
 ┌────────────────────────── Arena Core Layer ───────────────────────────┐
 │ pnl-types.ts        domain contracts (Cell, Agent, Portfolio, Trade)  │
@@ -240,7 +252,7 @@ If any gate fails, champion metadata is retained but launch is blocked.
 | DexScreener market feed | Real |
 | Floor progression + elimination | Deterministic simulation |
 | AI trade reasoning | Hybrid (Claude + deterministic paths) |
-| Pump.fun graduation pipeline | Integrated flow |
+| Bags-track launch pipeline | Integrated (current rail: PumpPortal) |
 
 ## Repository Structure (Responsibility-First)
 
@@ -256,7 +268,7 @@ narkina5-frontend/
       pnl-competition.ts     # Bracket engine and elimination logic
       pnl-market.ts          # Market ingest and normalization
       agent.ts               # AI decision client
-      pumpfun.ts             # Launch integration service
+      pumpfun.ts             # Launch integration service (Bags-track objective)
       agenc.ts               # AgenC protocol helpers
       transactions.ts        # Solana tx builders
     contexts/
@@ -269,7 +281,7 @@ narkina5-frontend/
     market.ts                # DexScreener proxy
     agent.ts                 # Claude endpoint
     pnl-agent.ts             # PnL decision endpoint
-    pumpfun.ts               # Pump.fun proxy
+    pumpfun.ts               # Launch proxy (PumpPortal rail)
 ```
 
 ## Tech Stack
@@ -281,7 +293,7 @@ narkina5-frontend/
 | Wallet | Privy |
 | AI | Claude (Haiku 4.5) |
 | Market Data | DexScreener API |
-| Launch | Pump.fun + PumpPortal |
+| Launch | Bags-track objective (current rail: PumpPortal) |
 | Deployment | Vercel |
 
 ## Test Coverage
@@ -306,7 +318,7 @@ Create `.env`:
 ```bash
 VITE_PRIVY_APP_ID=your_privy_app_id
 ANTHROPIC_API_KEY=your_anthropic_api_key
-VITE_TOKEN_CA=your_pump_fun_token_ca
+VITE_TOKEN_CA=your_launch_token_ca
 VITE_PROJECT_X_URL=https://x.com/Narkina5Agent
 VITE_PROJECT_WEBSITE_URL=https://narkina5.vercel.app
 ```

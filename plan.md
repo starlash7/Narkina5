@@ -12,6 +12,13 @@ Interpretation for this repo:
 - Prefer stability, determinism, and resilience over feature volume.
 - Any large change must include rollback notes and a focused risk list.
 
+Primary external objective:
+- Optimize execution for the Bags Hackathon ranking model:
+  - onchain performance
+  - app traction
+  - verified and publicly auditable shipping
+  - deeper Bags integration
+
 ## Per-Session Start Checklist
 
 1. Run quick system audit:
@@ -35,11 +42,11 @@ Done:
 - README architecture and workflow docs are updated.
 
 Next (priority order):
-1. Error/Recovery map hardening for launch path and market path.
-2. Reproducibility hardening: deterministic season replay artifact improvements.
-3. Portfolio safety hardening: exposure/position concentration constraints tuning.
-4. Runtime performance: chunk split strategy and heavy dependency load isolation.
-5. Agent-quality loop: confidence and adaptation updates tied to richer outcomes.
+1. Bags integration path hardening (token/API/fee-sharing compatibility).
+2. Error/Recovery map hardening for launch path and market path.
+3. Reproducibility hardening: deterministic season replay artifact improvements.
+4. Portfolio safety hardening: exposure/position concentration constraints tuning.
+5. Runtime performance: chunk split strategy and heavy dependency load isolation.
 
 ## Recovery Protocol (When a change fails)
 
